@@ -1,0 +1,222 @@
+---
+title: "CellRanger_QC"
+author: "AndrewHart"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+#Description
+# All samples were run through Cell Ranger v 8.0.0 and the output was used for all downstream analyses. In this Script, the raw metrics from cell ranger are evaluated
+#Figure Panels produced : S1A, S1B
+##Load the Libraries----
+```{r, warning=FALSE, error=FALSE}
+library(dplyr)
+library(ggplot2)
+library(reshape2)
+library(data.table)
+library(cowplot)
+library(forcats)
+library(ggbreak)
+library(RColorBrewer)
+library(gt)
+```
+
+#directory set up
+```{r}
+getwd() #/home/hartandrew
+setwd("/path/to/analysis/directory")
+out <- "/path/to/analysis/directory/Output"
+version <- "/path/to/analysis/directory/Version"
+images <- "/path/to/analysis/directory/Images"
+CSV <- "/path/to/analysis/directory/CSV"
+QC_CellRanger <- "/path/to/analysis/directory/QC_Sequencing"
+```
+#Color Picking
+```{r}
+colors7 <- c("#980339", "#379FFB", "#D6A206", "#027102", "#6313B7", "#AFAFAF","#542600" )
+colors8 <- c("#332288", "#88CCEE", "#117733", "#A27DF1", "#DDCC77",  "#AA4499", "#CC6677", "#882255")
+colors9 <- c("#332288", "#88CCEE", "#117733","#44AA99", "#A27DF1", "#DDCC77",  "#AA4499", "#CC6677", "#882255")
+colors_dup <- c("#980339","#980339", "#379FFB", "#379FFB", "#379FFB", "#D6A206", "#D6A206","#027102" )
+colors_dup2 <- c("#980339","#980339", "#379FFB", "#379FFB",  "#D6A206", "#D6A206", "#027102")
+colors_mln_samp <- c("#980339","#980339", "#379FFB", "#379FFB", "#379FFB", "#D6A206", "#D6A206","#027102","#027102","#6313B7" )
+```
+#Load the CellRanger Metrics into a single file
+```{r}
+#All Metrics summaries from Cell Ranger output are copied into the MIST_METRICS folder prior to running
+file.list <- list.files("/path/CellRanger/MIST_METRICS", pattern=".csv", full.names=T)
+file.list[[1]]
+file.names <- unlist(file.list)
+file.names <- gsub('/path/CellRanger/MIST_METRICS/','',file.names)
+file.names <- gsub('_metrics_summary.csv','',file.names)
+combined_files <- do.call("rbind", lapply(file.list, read.csv))
+combined_files$Sample <- file.names
+```
+
+#Add relevant Metadata
+```{r}
+
+combined_files$Chemistry  <- ifelse(combined_files$Sample %in% c("MIST2482_MLN", "MIST2482_LP", "MIST2482_IEL", "MIST2489_MLN", "MIST2489_IEL", "MIST2489_LP"), "V3", "V4")
+Mouse.names <- gsub('_LP','', gsub('_MLN','', gsub('_IEL','', file.names))) # Multiple nested gsub
+combined_files$Mouse  <- Mouse.names
+Tissue.names <- gsub('.*_LP','LP', gsub('.*_MLN','MLN', gsub('.*_IEL','IEL', file.names))) 
+combined_files$Tissue <- Tissue.names 
+
+combined_files$Infection[combined_files$Mouse %like% "MIST2482" | combined_files$Mouse %like% "MIST24109"] <- "Naive"
+combined_files$Infection[combined_files$Mouse %like% "MIST2489" | combined_files$Mouse %like% "MIST2493"| combined_files$Mouse %like% "MIST24240"] <- "Cryptosporidium"
+combined_files$Infection[combined_files$Mouse %like% "MIST24134" | combined_files$Mouse %like% "MIST24142" | combined_files$Mouse %like% "MIST24311"] <- "Yersinia"
+combined_files$Infection[combined_files$Mouse %like% "MIST24218" | combined_files$Mouse %like% "MIST24235"] <- "Candida"
+combined_files$Infection[combined_files$Mouse %like% "MIST24268" |combined_files$Mouse %like% "MIST24282" ] <- "Norovirus"
+combined_files$Infection[combined_files$Mouse %like% "MIST24353"  | combined_files$Mouse %like% "MIST25029" ] <- "SFB-CU"
+combined_files$Infection[combined_files$Mouse %like% "MIST25100"  | combined_files$Mouse %like% "MIST25114"  ] <- "SFB-YA"
+combined_files$Infection[combined_files$Mouse %like% "MIST25132"  | combined_files$Mouse %like% "MIST25134" ] <- "Nippostrongylus"
+
+combined_files <- combined_files[!combined_files$Infection =="SFB-CU",]
+```
+
+```{r}
+combined_files[] <- lapply(combined_files, function(x) {
+  if (is.character(x)) {
+    gsub("%", "", x)  # Remove %
+  } else {
+    x  # Return unchanged for non-character columns
+  }
+})
+combined_files[] <- lapply(combined_files, function(x) {
+  if (is.character(x)) {
+    gsub(",", "", x)  # Remove %
+  } else {
+    x  # Return unchanged for non-character columns
+  }
+})
+combined_files <- cbind(combined_files[34:38], combined_files[1:33])
+combined_files[, 6:ncol(combined_files)] <-  lapply(combined_files[, 6:ncol(combined_files)], function(x) as.numeric(gsub("[$,]", "", x)) )
+
+```
+#Graph Each Sample Independently
+```{r}
+ correlation <- cor.test(combined_files[,6], combined_files[,7], use = "complete.obs", method = "spearman")
+ ReadNumber <-  combined_files %>%
+   mutate(Sample = fct_reorder(Sample, dplyr::desc(Mean.Reads.per.Cell)))  %>%
+ggplot( aes(Sample, Number.of.Reads, fill = Infection)) + 
+   geom_bar(stat="identity", width=.8, position = "dodge")+  scale_fill_manual(values= colors8, breaks = c("Naive", "Cryptosporidium", "Yersinia", "Candida", "Norovirus", "SFB-CU", "SFB-YA", "Nippostrongylus")) +
+    theme(panel.background = element_rect(fill = "white", 
+            colour = NA), panel.border = element_rect(fill = NA, 
+            colour = "grey20"), panel.grid = element_line(colour = "grey92"), 
+            panel.grid.minor = element_line(linewidth = rel(0.5)), 
+          legend.position = "bottom",
+            strip.background = element_rect(fill = "grey85", 
+                colour = "grey20"), axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) 
+ReadNumber
+unique(combined_files$Tissue)
+mean(combined_files$Mean.Reads.per.Cell[combined_files$Tissue == "MLN"])
+mean(combined_files$Antibody..Mean.Reads.per.Cell[combined_files$Tissue == "MLN"])
+mean(combined_files$Mean.Reads.per.Cell[combined_files$Tissue %in% c("LP")])
+mean(combined_files$Mean.Reads.per.Cell[combined_files$Tissue %in% c("IEL")])
+mean(combined_files$Antibody..Mean.Reads.per.Cell[combined_files$Tissue %in% c( "IEL")])
+mean(combined_files$Antibody..Mean.Reads.per.Cell[combined_files$Tissue %in% c("LP")])
+class(combined_files$Infection)
+
+ ReadNumber <-  combined_files %>%
+   mutate(Sample = fct_reorder(Sample, Infection))  %>%
+ggplot( aes(Sample, Number.of.Reads, fill = Infection)) + 
+   geom_bar(stat="identity", width=.8, position = "dodge")+  scale_fill_manual(values= colors8, breaks = c("Naive", "Cryptosporidium", "Yersinia", "Candida", "Norovirus", "SFB-CU", "SFB-YA", "Nippostrongylus")) +
+    theme(panel.background = element_rect(fill = "white", 
+            colour = NA), panel.border = element_rect(fill = NA, 
+            colour = "grey20"), panel.grid = element_line(colour = "grey92"), 
+            panel.grid.minor = element_line(linewidth = rel(0.5)), 
+          legend.position = "bottom",
+            strip.background = element_rect(fill = "grey85", 
+                colour = "grey20"), axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + facet_wrap(combined_files$Tissue )
+ReadNumber
+
+Summary <- combined_files %>%
+  group_by(Tissue, Mouse) %>%
+  summarise(MeanReads = Mean.Reads.per.Cell, MeanReadsAdt = Antibody..Mean.Reads.per.Cell)
+```
+
+
+```{r}
+combined_files2 <- combined_files[combined_files$Tissue %in% c("MLN", "IEL", "LP"),]
+
+# Create named vector: names = Sample, values = Infection
+sample_labels <- setNames(as.character(combined_files2$Infection), combined_files2$Sample)
+
+infection_levels <- c("Naive", "Cryptosporidium", "Yersinia", "Candida",
+                      "Norovirus", "SFB-CU", "SFB-YA", "Nippostrongylus")
+
+combined_files2 <- combined_files2 %>%
+  mutate(Infection = factor(Infection, levels = infection_levels)) %>%
+  arrange(Tissue, Infection) %>%
+  mutate(Sample = factor(Sample, levels = unique(Sample)))
+
+tissue_means <- combined_files2 %>%
+  group_by(Tissue) %>%
+  summarise(mean_reads = mean(Mean.Reads.per.Cell, na.rm = TRUE))
+
+
+ReadNumber <- ggplot(combined_files2, aes(x = Sample, y = Mean.Reads.per.Cell, fill = Infection)) +
+  geom_bar(stat = "identity", width = 0.8, position = "dodge") +
+  geom_hline(data = tissue_means, aes(yintercept = mean_reads), color = "red", linetype = "dashed") +
+  scale_fill_manual(
+    values = colors8,
+    breaks = infection_levels
+  ) +
+  facet_wrap(~Tissue, scales = "free_x") +
+  scale_x_discrete(labels = sample_labels) +  # map sample names → infection labels
+  theme(
+    panel.background = element_rect(fill = "white", colour = NA),
+    panel.border = element_rect(fill = NA, colour = "grey20"),
+    panel.grid = element_line(colour = "grey92"),
+    panel.grid.minor = element_line(linewidth = rel(0.5)),
+    legend.position = "bottom",
+    axis.title.x = element_blank(),
+    axis.title.y = element_text(color = "black", size = 12),
+    strip.background = element_rect(fill = "grey85", colour = "grey20"),
+    axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)
+  ) +
+  ylab("Number of Reads")
+
+ReadNumber
+
+ggsave(paste0(images, "/mRNA_readDepth_FigureS1.svg"), plot = last_plot(), width = 11, height = 4)
+
+tissue_means <- combined_files2 %>%
+  group_by(Tissue) %>%
+  summarise(mean_reads = mean(Antibody..Mean.Reads.per.Cell, na.rm = TRUE))
+
+
+ReadNumber <- ggplot(combined_files2, aes(x = Sample, y = Antibody..Mean.Reads.per.Cell, fill = Infection)) +
+  geom_bar(stat = "identity", width = 0.8, position = "dodge") +
+  geom_hline(data = tissue_means, aes(yintercept = mean_reads), color = "red", linetype = "dashed") +
+  scale_fill_manual(
+    values = colors8,
+    breaks = infection_levels
+  ) +
+  facet_wrap(~Tissue, scales = "free_x") +
+  scale_x_discrete(labels = sample_labels) +  # map sample names → infection labels
+  theme(
+    panel.background = element_rect(fill = "white", colour = NA),
+    panel.border = element_rect(fill = NA, colour = "grey20"),
+    panel.grid = element_line(colour = "grey92"),
+    panel.grid.minor = element_line(linewidth = rel(0.5)),
+    legend.position = "bottom",
+    axis.title.x = element_blank(),
+    axis.title.y = element_text(color = "black", size = 12),
+    strip.background = element_rect(fill = "grey85", colour = "grey20"),
+    axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)
+  ) +
+  ylab("Number of Reads")
+
+ReadNumber
+
+ggsave(paste0(images, "/ADT_readDepth_FigureS1.svg"), plot = last_plot(), width = 11, height = 4)
+
+
+```
+
+
+
+

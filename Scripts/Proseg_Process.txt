@@ -1,0 +1,75 @@
+#Xenium Prep - resegmentation of the data by Proseg segmentation
+#  Run the Xenium output through PRoseg for each sample
+singularity instance run \
+    --bind "/path/to/xenium/output/folder:/data/input" \
+    --bind "path/to/desired/output:/data/output" \
+    --cpus 36 \
+    --containall \
+    --workdir /path/to/working/dir \
+    --home /path/to/home/dir \
+    --memory 1000G \
+    /usr/local/bin/proseg.sif \ # location of the singularity instance containing proseg
+    PROSEG_INSTANCE_name \ # Name for proseg instance
+    --xenium \
+    --output-path /data/output/ \
+    --min-qv 20 \
+    --nthreads 36 \
+    "/data/input/transcripts.parquet"
+
+#when finished, stopthe singularity instance 
+singularity instance stop PROSEG_INSTANCE_name
+
+#Convert Each Proseg Output to Baysor Output
+#Change directory to Proseg output folder above
+proseg-to-baysor \
+    transcript-metadata.csv.gz \
+    cell-polygons.geojson.gz \
+    --output-transcript-metadata baysor-transcript-metadata.csv \
+    --output-cell-polygons baysor-cell-polygons.geojson
+
+#Convert Each Baysor to Xenium Ranger
+/data/Scripts/XeniumRanger.sh /path/to/original/xenium/output /Path/to/Proseg/output Name_for_output_folder
+
+
+
+
+#Script for XeniumRanger.sh below 
+
+
+#!/usr/bin/env bash
+# This script will run Xenium ranger on the baysor version of the Proseg output
+
+# Exit immediately if something fails
+set -e
+
+# Check if the required arguments are provided the arguments are the path to the xenium output, the path to the Proseg output and the name you want to give the Xenium Ranger output
+if [ "$#" -lt 3 ]; then
+    echo "Usage: $0 <xenium_bundle_directory> <proseg_directory> <id>"
+    exit 1
+fi
+
+# Assign arguments
+XENIUM_BUNDLE_DIR=$(realpath "$1")
+PROSEG_DIR=$(realpath "$2")
+ID="$3"
+
+# Clean up paths - removes trailing slashes
+XENIUM_BUNDLE_DIR=${XENIUM_BUNDLE_DIR%/}
+PROSEG_DIR=${PROSEG_DIR%/}
+
+cd $PROSEG_DIR
+# Run the Singularity command
+singularity exec \
+    --bind "$XENIUM_BUNDLE_DIR":/data/xenium-bundle \
+    --bind "$PROSEG_DIR":/data/xenium-proseg \
+    --cpus 16 \
+    /usr/local/bin/xeniumranger_v311.sif \
+        xeniumranger import-segmentation \
+            --id "$ID" \
+            --xenium-bundle /data/xenium-bundle \
+            --viz-polygons /data/xenium-proseg/baysor-cell-polygons.geojson \
+            --transcript-assignment /data/xenium-proseg/baysor-transcript-metadata.csv \
+            --units microns \
+            --localcores 16 \
+            --disable-ui true \
+            --localmem=1500

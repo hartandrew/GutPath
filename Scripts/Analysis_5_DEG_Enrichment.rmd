@@ -1,0 +1,1463 @@
+---
+title: "Analysis2.6_Figure_plotting"
+author: "AndrewHart"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+# Description: This Script is both exploratory and functions to produce many figures. First, MAST based DEG analyss was performed and the results analyzed through a variety of mehcanisms. Next, UCell enrichment analysis of gene sets was performed and analyzed 
+# Figures produced in this script include Figure S5A, Figure 4A, Figure 4B, Figure 4C, Figure 3C , Figure 3D, Figure 3F, Figure 3H, Figure S4E, Figure 3E, Figure 3G , Figure S4A, Figure S4B, Figure S4C, Figure S4D
+#Load Libraries 
+```{r}
+library(Seurat)
+library(Signac)
+library(dplyr)
+library(ggplot2)
+library(reshape2)
+library(data.table)
+library(cowplot)
+library(scCustomize)
+library(forcats)
+library(ggbreak) 
+library(presto) 
+library(ggforce)
+library(SingleR)
+library(celldex)
+library(harmony)
+#library(Azimuth)
+library(glmGamPoi) 
+library(future)
+library(dsb) 
+library(SeuratDisk) 
+library(RColorBrewer)
+library(monocle3)
+library(gt)
+library(SeuratWrappers)
+library(pheatmap)
+library(grid)
+library(gridExtra)
+library(qs2)
+library(tidyr)
+library(tibble)
+library(ggfortify)
+library(ggrepel)
+library(purrr)
+options(future.globals.maxSize = 5000 * 1024^2)
+```
+
+#Establish Directories
+```{r} 
+getwd() #/home/hartandrew
+setwd("/path/to/analysis/directory")
+out <- "/path/to/analysis/directory/Output"
+version <- "/path/to/analysis/directory/Version"
+seurat <- "/path/to/analysis/directory/Seurat_Files"
+images <- "/path/to/analysis/directory/Images"
+CSV <- "/path/to/analysis/directory/CSV"
+
+```
+#Set colors
+```{r}
+colors7 <- c("#980339", "#379FFB", "#D6A206", "#027102", "#6313B7", "#AFAFAF","#542600" )
+colors6 <- c("#980339", "#379FFB", "#D6A206", "#027102", "#6313B7", "#AFAFAF")
+colors5 <- c("#980339", "#379FFB", "#D6A206", "#027102", "#6313B7")
+colors8 <- c("#332288", "#88CCEE", "#117733", "#A27DF1", "#DDCC77",  "#AA4499", "#CC6677", "#882255")
+colors9 <- c("#332288", "#88CCEE", "#117733","#44AA99", "#A27DF1", "#DDCC77",  "#AA4499", "#CC6677", "#882255")
+cbf_18_colors <- c(
+  "#1170AA",  
+  "#FCB13F",  
+  "#60BFC1",  
+  "#EF6F6A",  
+    "#937860", 
+  "#D17A00",  
+  "#B78CBA",  
+  "#B3B3B3",  
+    "#64B200", 
+  "#D45E00",  
+  "#7E8CCF",  
+  "#E6A0C4",  
+  "#568B3F",  
+  "#C44E52",
+   "#5FA2A3", 
+  "#CCB974", 
+  "#D0A6BE", 
+  "#4E84C4"  
+)
+```
+
+#Load Objects
+```{r}
+#MLN_filt <- qs_read("/path/to/analysis/directory/Seurat_Files/Analysis2_MLN_clustered_annotated.qs2")
+Ileum_filt <- qs_read("/path/to/analysis/directory/Seurat_Files/Analysis2.5_Ileum.qs2")
+```
+
+# Remove the Duodenum from the data  we focus on the ileum to contrast between infections
+```{r}
+unique(Ileum_filt$SampleType)
+Idents(Ileum_filt) <- "SampleType"
+Ileum_filt_i <- subset(Ileum_filt, idents = c("Ileum Lamina Propria" , "Ileum Intestinal Epithelial Cells" ))
+cell_counts <- Ileum_filt_i@meta.data %>%
+  group_by(InfectionStatus, Mouse, secondlevel) %>%
+  summarise(n_cells = n(), .groups = "drop")
+
+# For each InfectionStatus and secondlevel, count how many mice have >=10 cells
+qualified_celltypes <- cell_counts %>%
+  group_by(InfectionStatus, secondlevel) %>%
+  summarise(mice_with_10plus = sum(n_cells >= 10), .groups = "drop") %>%
+  filter(mice_with_10plus < 2)
+
+# Get list of problematic cell types
+bad_celltypes <- qualified_celltypes %>%
+  distinct(secondlevel) %>%
+  pull(secondlevel)
+
+# View result
+print("Cell types with <10 cells in at least 2 mice for any condition:")
+print(bad_celltypes)
+length(unique(Ileum_filt_i$secondlevel))
+
+```
+
+# Compare Each Cell Type for Each condition - A separate script was run to perform the analysis in base R - DEG_MAST.r
+# The above script produces the DEG output read in below
+
+```{r}
+library(tidyr)
+# MAST method for DEG analysis takes a very long time
+all_conditions <- setdiff(unique(Ileum_filt$InfectionStatus), "Naive")
+all_celltypes <- unique(Ileum_filt$secondlevel)
+
+all_degs_df <- data.table::fread("/path/to/analysis/directory/CSV/all_degs_df_20250918.csv")
+
+results_list <- list()
+sig_degs <- all_degs_df %>% filter(global_padj < 0.05)
+
+# Summarize DEGs per condition × cell type
+summary_df <- sig_degs %>%
+  group_by(condition, celltype) %>%
+  summarise(
+    total_deg = n(),
+    up_deg = sum(avg_log2FC > 0),
+    down_deg = sum(avg_log2FC < 0),
+    avg_abs_logFC = mean(abs(avg_log2FC), na.rm = TRUE),
+    .groups = "drop"
+  )
+# Fill in missing entries
+for (cond in all_conditions) {
+  for (ct in all_celltypes) {
+    key <- paste(cond, ct, sep = "_")
+    if (!key %in% names(results_list)) {
+      # Add from summary_df if present
+      matched <- summary_df %>% filter(condition == cond & celltype == ct)
+      if (nrow(matched) > 0) {
+        results_list[[key]] <- matched
+      } else {
+        results_list[[key]] <- tibble(
+          condition = cond,
+          celltype = ct,
+          total_deg = 0,
+          up_deg = 0,
+          down_deg = 0
+        )
+      }
+    }
+  }
+}
+
+results_df <- bind_rows(results_list)
+# Remove the cell types which did not have at least 10 cells in Naive for comparison 
+results_df_filt <- results_df[!results_df$celltype %in% c("cDC1s", "Cycling ILCs", "Mast Cells", "Mesothelial Cells", "Neutrophils"),]
+```
+
+
+
+```{r}
+#This chunk makes a bubble plot where each bubble is a pie chart showing the number of upregulated and downregulated genes for ecah cell types within each infection from DEG analysis 
+cellorder <- c("Enteric Glia",  "Monocytes" , "Macrophages" , "Plasmacytoid DCs" ,   "cDC2s" , 
+                                    
+               "ILC1s" , "ILC2s" ,  "ILC3s"  ,   "NK Cells"  , "NKT Cells" ,
+               "Cycling T Cells",  "CD4 ab T Cells" , "Effector CD4 ab T Cells" , "CD8 ab T Cells" , "Effector CD8 ab T Cells" ,    "gd T Cells",
+                "GC B Cells" ,  "B Cells", "Plasma Cells", 
+                  "Stem Cells" , "Transit Amplifying Cells" ,  "Enterocytes" ,  "Goblet Cells"  ,  "Tuft Cells"   ,  "Paneth Cells"   ,  "Enteroendocrine Cells" ,
+                "Lymphatic Endothelial Cells" , "Blood Endothelial Cells",   "Fibroblasts",         "Smooth Muscle Cells"   , "Stromal Cells"     )
+
+infections <- c("Yersinia", "SFB_YA", "Nippostrongylus", "MNV", "Cryptosporidium", "Candida" )
+
+all_combos <- expand.grid(
+  condition = infections,
+  celltype = cellorder,
+  stringsAsFactors = FALSE
+)
+
+x_spacing <- 4   # Spread bubbles apart horizontally
+y_spacing <- 4 
+
+results_df_filt$celltype <- factor(results_df_filt$celltype, levels = cellorder)
+results_df_filt$condition <- factor(results_df_filt$condition, levels = infections)
+plot_df <- full_join(all_combos, results_df_filt, by = c("condition", "celltype")) %>%
+  replace_na(list(total_deg = 0, up_deg = 0, down_deg = 0)) %>%
+  mutate(
+    total = up_deg + down_deg,
+    up_frac = ifelse(total > 0, up_deg / total, NA),
+    down_frac = ifelse(total > 0, down_deg / total, NA),
+    start_up = 0,
+    end_up = 2 * pi * up_frac,
+    start_down = end_up,
+    end_down = 2 * pi,
+    # Axis positions
+    x = as.numeric(factor(condition, levels = infections)) * x_spacing,
+    y = as.numeric(factor(celltype, levels = cellorder)) * y_spacing,
+    # Scaled bubble radius using log10
+    bubble_radius = log10(total + 1) / 2 
+  )
+
+
+p <- ggplot() +
+  #light gray background circle for tested + 0 DEGs
+  geom_point(
+    data = plot_df %>% filter(total == 0),
+    aes(x = y, y = x),
+    shape = 21, fill = "lightgray", color = "black", size = 3
+  ) +
+  
+  # Upregulated pie slice
+  geom_arc_bar(
+    data = plot_df %>% filter(total > 0),
+    aes(
+      x0 = y, y0 = x,
+      r0 = 0, r = bubble_radius,
+      start = start_up, end = end_up,
+      fill = "Upregulated"
+    ),
+    color = "black"
+  ) +
+  
+  # Downregulated pie slice
+  geom_arc_bar(
+    data = plot_df %>% filter(total > 0),
+    aes(
+      x0 = y, y0 = x,
+      r0 = 0, r = bubble_radius,
+      start = start_down, end = end_down,
+      fill = "Downregulated"
+    ),
+    color = "black"
+  ) +
+  scale_x_continuous(
+    breaks = sort(unique(plot_df$y)),
+    labels = cellorder) +
+  scale_y_continuous(
+    breaks = sort(unique(plot_df$x)),
+    labels = infections) +
+  scale_fill_manual(values = c("Upregulated" = "#99000D", "Downregulated" = "#08306B")) +
+  coord_fixed() + 
+  theme_minimal(base_size = 14) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    panel.grid = element_blank(), axis.title = element_blank(),
+    legend.position = "right"
+  ) +
+  labs( x = "Condition", y = "Cell Type", fill = "Direction of DEGs")
+
+
+print(p)
+ggsave( "CEllTypexCondition_DEG_BubblePie_Nolegend_sep2025.svg",  plot = last_plot() , device = NULL, 
+        path = images, width = 13,  height =17,  units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
+```
+
+
+
+```{r}
+#Here I will perform two analyses. I will look only at DEGs regardless of cell type and create PCA and similarity indices based on this information across conditions
+
+
+deg_table_all <- all_degs_df %>%
+  filter(global_padj < 0.05)  # Or your preferred DEG threshold
+
+# Create binary gene x condition matrix (1 = DE in any cell type)
+binary_mat <- deg_table_all %>%
+  distinct(condition, gene) %>%
+  mutate(value = 1) %>%
+  pivot_wider(names_from = condition, values_from = value, values_fill = 0) %>%
+  column_to_rownames("gene")
+
+# Jaccard distance matrix - calculates overlap in DEGs between any two conditions, regardless of cell type
+library(vegan)
+jaccard_dist <- vegdist(t(binary_mat), method = "jaccard")
+
+# Hierarchical clustering
+hc <- hclust(jaccard_dist, method = "average")
+plot(hc, main = "Clustering of Conditions by DEG Gene Overlap (Jaccard)", xlab = "")
+
+binary_mat_filtered <- binary_mat[rowSums(binary_mat) > 0, ]  # remove all-0s
+binary_mat_filtered <- binary_mat_filtered[apply(binary_mat_filtered, 1, function(x) var(x) > 0), ]  # remove constant rows
+
+#Remove conditions with no variation
+binary_mat_filtered <- binary_mat_filtered[, apply(binary_mat_filtered, 2, function(x) var(x) > 0) ]
+
+pca_res <- prcomp(t(binary_mat_filtered), scale. = TRUE)
+pca_df <- as.data.frame(pca_res$x)
+pca_df$condition <- rownames(pca_df)
+ggplot(pca_df, aes(x = PC1, y = PC2, label = condition)) +
+  geom_point(size = 4, color = "#2c7fb8") +
+  geom_text_repel(size = 5, max.overlaps = 100) +
+  theme_minimal(base_size = 14) +
+  labs(title = "PCA of DEG Gene Overlap Between Conditions",
+       x = paste0("PC1 (", round(summary(pca_res)$importance[2, 1] * 100, 1), "% variance)"),
+       y = paste0("PC2 (", round(summary(pca_res)$importance[2, 2] * 100, 1), "% variance)"))
+
+
+#This is the second half of the analysis and it includes information about the cell types - so in order for a gene to provide meaningful interaction or links between conditions, it must be DE in the same cell type. 
+
+deg_filtered <- all_degs_df %>%
+  filter(global_padj < 0.05 & avg_log2FC >1)
+deg_filtered <- deg_filtered %>%
+  mutate(gene_celltype = paste(gene, celltype, sep = "__"))
+binary_mat_gc <- deg_filtered %>%
+  distinct(gene_celltype, condition) %>%
+  mutate(value = 1) %>%
+  pivot_wider(names_from = condition, values_from = value, values_fill = 0) %>%
+  column_to_rownames("gene_celltype")
+
+binary_mat_gc <- binary_mat_gc[apply(binary_mat_gc, 1, function(x) var(x) > 0), ]
+binary_mat_gc <- binary_mat_gc[, apply(binary_mat_gc, 2, function(x) var(x) > 0) ]
+# Transpose rows = conditions, columns = gene__celltype features
+pca_gc <- prcomp(t(binary_mat_gc), scale. = TRUE)
+
+# Get PCA coordinates 
+pca_gc_df <- as.data.frame(pca_gc$x)
+pca_gc_df$condition <- rownames(pca_gc_df)
+
+ggplot(pca_gc_df, aes(x = PC1, y = PC2, label = condition)) +
+  geom_point(size = 4, color = "#2c7fb8") +
+  geom_text_repel(size = 5) +
+  theme_minimal(base_size = 14) +
+  labs(title = "PCA of DEG Overlap (Gene + Cell Type Specific)",
+       x = paste0("PC1 (", round(summary(pca_gc)$importance[2, 1] * 100, 1), "% variance)"),
+       y = paste0("PC2 (", round(summary(pca_gc)$importance[2, 2] * 100, 1), "% variance)"))
+
+ggplot(pca_gc_df, aes(x = PC3, y = PC2, label = condition)) +
+  geom_point(size = 4, color = "#2c7fb8") +
+  geom_text_repel(size = 5) +
+  theme_minimal(base_size = 14) +
+  labs(title = "PCA of DEG Overlap (Gene + Cell Type Specific)",
+       x = paste0("PC3 (", round(summary(pca_gc)$importance[2, 3] * 100, 1), "% variance)"),
+       y = paste0("PC2 (", round(summary(pca_gc)$importance[2, 2] * 100, 1), "% variance)"))
+
+
+
+# Make Small Multiples to visualize the differences in gene expression  
+scores_df <- as.data.frame(pca_gc$x[,1:3])
+scores_df$condition <- rownames(scores_df)
+
+melted <- reshape2::melt(scores_df,
+                         id.vars = "condition",
+                         variable.name = "PC",
+                         value.name = "score")
+ggplot(melted, aes(x = condition, y = score, fill = condition)) +
+  geom_col() +
+  facet_wrap(~ PC, scales = "free_y") + coord_flip() +
+  theme_minimal()
+
+
+
+library(vegan)
+jaccard_gc <- vegdist(t(binary_mat_gc), method = "jaccard")
+hc_gc <- hclust(jaccard_gc, method = "average")
+plot(hc_gc, main = "Hierarchical Clustering: Gene x Cell Type DEG Overlap", xlab = "")
+
+library(ggdendro)
+dend_data <- ggdendro::dendro_data(hc_gc)
+ggplot() +
+  geom_segment(data = segment(dend_data),
+               aes(x = x, y = y, xend = xend, yend = yend),
+               linewidth = 0.6) +
+  geom_text(data = label(dend_data),
+            aes(x = x, y = y, label = label),
+            hjust = 0, 
+            size = 4,
+            fontface = "bold") +
+  coord_flip() +  
+  theme_minimal(base_size = 14) +
+  theme(
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    panel.grid = element_blank(),
+    plot.margin = margin(10, 50, 10, 10) 
+  ) +
+  labs(title = "Hierarchical Clustering: DEG Overlap by Condition", x = NULL, y = NULL)
+
+ggsave(paste0(images, "/Dendogram_DEG_similarity_byCondition.svg"), width = 4, height = 8, plot = last_plot())
+
+```
+
+
+```{r}
+# Create a bar plot which shows the total number of upregulated and downregulated genes across all cell types in and across infections
+
+all_degs_df <- all_degs_df %>%
+  filter(global_padj < 0.05)
+
+# Separate upregulated and downregulated genes
+up_genes <- all_degs_df %>%
+  filter(avg_log2FC > 0) %>%
+  group_by(condition) %>%
+  summarise(
+    unique_up_genes = n_distinct(gene),
+    .groups = "drop"
+  )
+
+down_genes <- all_degs_df %>%
+  filter(avg_log2FC < 0) %>%
+  group_by(condition) %>%
+  summarise(
+    unique_down_genes = n_distinct(gene),
+    .groups = "drop"
+  )
+
+# Combine into one summary table
+deg_summary_by_condition <- full_join(up_genes, down_genes, by = "condition") %>%
+  arrange(condition)
+
+
+deg_summary_long <- deg_summary_by_condition %>%
+  pivot_longer(cols = c(unique_up_genes, unique_down_genes),
+               names_to = "Direction", values_to = "Count") %>%
+  mutate(
+    Direction = case_when(
+      Direction == "unique_up_genes" ~ "Upregulated",
+      Direction == "unique_down_genes" ~ "Downregulated"
+    ),
+    Count = ifelse(Direction == "Downregulated", -Count, Count)
+  )
+
+deg_summary_long$condition <- factor(deg_summary_long$condition, levels = infections)
+
+ggplot(deg_summary_long, aes(x = Count, y = condition, fill = Direction)) +
+  geom_bar(stat = "identity", position = "identity") +
+  scale_fill_manual(values = c("Upregulated" = "#99000D", "Downregulated" = "#08306B")) +
+  labs(
+    x = "Number of DEGs"
+  ) +
+  theme_minimal() +
+  geom_vline(xintercept = 0, color = "black") +
+  theme(
+    text = element_text(size = 14),
+    axis.title.y = element_blank(),
+    legend.position = "none"
+  )
+ggsave( "Combined_DEGS-across cellTypes_Barplot_sep2025.svg",  plot = last_plot() , device = NULL, 
+        path = images, width = 6,  height = 5,  units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
+```
+
+
+```{r}
+# Examine both the number and trends in overall strength (logFC) of DEGs across the different cell types. Violin plot
+
+sig_degs <- all_degs_df %>%
+  filter(global_padj < 0.05)
+
+# Summarize average log2FC per gene per condition
+avg_lfc_by_condition <- sig_degs %>%
+  group_by(condition) %>%
+  summarise(
+    mean_log2FC = mean(avg_log2FC, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# Each condition will have a "line" of gene points sorted by logFC
+
+# Line Chart
+sig_degs <- sig_degs %>%
+  mutate(
+    signed_logfc = sign(avg_log2FC) * log10(abs(avg_log2FC) + 1)
+  )
+
+ggplot(sig_degs, aes(x = signed_logfc, y = ..density.., color = condition)) +
+  geom_density(size = 1) +
+  theme_minimal(base_size = 14) +
+  labs(
+    x = "Signed log10-transformed avg_log2FC",
+    y = "Density",
+    color = "Condition"
+  )
+
+
+# Plot frequency polygon
+ggplot(sig_degs, aes(x = signed_logfc, color = condition)) +
+  geom_freqpoly(binwidth = 0.05, size = 1.2) +  
+  theme_minimal(base_size = 14) +
+  scale_color_manual(values = cbf_18_colors) +
+  labs(
+    x = "Log10 transformed Avg LogFC",
+    y = "Number of genes",
+    color = "Infection"
+  ) +
+  theme(
+    panel.grid.major = element_line(color = "grey90"),
+    axis.title.y = element_text(size = 14),
+    axis.title.x = element_text(size = 14), 
+    panel.grid.minor = element_blank(), 
+    axis.text = element_text(color = "black")
+  )
+ggsave( "LineChart_of_DEG_by_Infection_Fig4_oct2025.svg",  plot = last_plot() , device = NULL, 
+        path = images, width = 6,  height = 4,  units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
+
+
+# Make sure infection (condition) is ordered consistently
+sig_degs$condition <- factor(
+  sig_degs$condition,
+  levels = c("Naive", "Candida", "Cryptosporidium", "MNV", 
+             "Nippostrongylus", "SFB_YA", "Yersinia")
+)
+
+sig_degs <- sig_degs %>%
+  mutate(
+    signed_logfc = sign(avg_log2FC) * log10(abs(avg_log2FC) + 1)
+  )
+ggplot(sig_degs, aes(x = condition, y = signed_logfc, fill = condition)) +
+  geom_violin(trim = TRUE, scale = "width", alpha = 0.8, color = "black", linewidth = 0.2) +
+  geom_boxplot(width = 0.15, outlier.shape = NA, alpha = 0.5, color = "black") +
+  theme_minimal(base_size = 14) +
+  scale_fill_manual(values = cbf_18_colors) +
+  labs(
+    x = NULL,
+    y = "Log10 LogFC",
+    fill = "Condition",
+    title = "Distribution of DE Gene Expression Changes per Infection"
+  ) +
+  theme(
+    panel.grid.major = element_line(color = "grey90"),
+    panel.grid.minor = element_blank(),
+    axis.text.x = element_text(angle = 45, hjust = 1, color = "black"),
+    axis.text.y = element_text(color = "black"),
+    legend.position = "none"
+  )
+
+#Figure S5A produced here
+# Save
+ggsave(
+  "Violin_DEG_logFC_by_Infection_Fig4_oct2025_transformed.svg",
+  plot = last_plot(),
+  device = NULL,
+  path = images,
+  width = 6,
+  height = 9,
+  units = "in",
+  dpi = 600,
+  limitsize = TRUE,
+  bg = NULL
+)
+```
+
+```{r}
+# create a Barplot for Enterocytes/StemCells/TA showing the total number of DEGs in these cell types across the infections
+all_degs_df_entero <- all_degs_df %>%
+  filter(celltype %in% c("Enterocytes", "Stem Cells", "Transit Amplifying Cells")) %>%
+  filter(global_padj < 0.05 )
+
+
+# Separate upregulated and downregulated genes
+up_genes_entero <- all_degs_df_entero %>%
+  filter(avg_log2FC > 0) %>%
+  group_by(condition) %>%
+  summarise(
+    unique_up_genes = n_distinct(gene),
+    .groups = "drop"
+  )
+
+down_genes_entero <- all_degs_df_entero %>%
+  filter(avg_log2FC < 0) %>%
+  group_by(condition) %>%
+  summarise(
+    unique_down_genes = n_distinct(gene),
+    .groups = "drop"
+  )
+
+# summary table
+deg_summary_by_condition_e <- full_join(up_genes_entero, down_genes_entero, by = "condition") %>%
+  arrange(condition)
+
+deg_summary_long_entero <- deg_summary_by_condition_e %>%
+  pivot_longer(cols = c(unique_up_genes, unique_down_genes),
+               names_to = "Direction", values_to = "Count") %>%
+  mutate(
+    Direction = case_when(
+      Direction == "unique_up_genes" ~ "Upregulated",
+      Direction == "unique_down_genes" ~ "Downregulated"
+    ),
+    Count = ifelse(Direction == "Downregulated", -Count, Count)
+  )
+
+deg_summary_long_entero$condition <- factor(deg_summary_long_entero$condition, levels = infections)
+
+ggplot(deg_summary_long_entero, aes(x = Count, y = condition, fill = Direction)) +
+  geom_bar(stat = "identity", position = "identity") +
+  scale_fill_manual(values = c("Upregulated" = "#99000D", "Downregulated" = "#08306B")) +
+  labs(
+    x = "Number of DEGs"
+  ) +
+  theme_minimal() +
+  geom_vline(xintercept = 0, color = "black") +
+  theme(
+    text = element_text(size = 14),
+    axis.title.y = element_blank(),
+    legend.position = "none"
+  )
+
+ggsave( "Combined_DEGS_Enterocytes_Stem_Transit_Barplot_sep2025.svg",  plot = last_plot() , device = NULL, 
+        path = images, width = 6,  height = 5,  units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
+
+```
+
+```{r}
+#Create a stacked bar chart of all the DEGs and the cell types they occur in  - this shows us numerically which cell types have the most DEGs
+# First looking only at upregulated DEGs
+#Figure 4A and Figure 4B produced here 
+Upregulated <- all_degs_df %>%
+  filter(  global_padj < 0.05 & abs(avg_log2FC) > 0)
+
+deg_counts <- Upregulated %>%
+  group_by(celltype, condition) %>%
+  summarise(n_genes = n_distinct(gene), .groups = "drop")
+
+# Reorder cell types by total n_genes across conditions
+deg_counts <- deg_counts %>%
+  group_by(celltype) %>%
+  mutate(total_genes = sum(n_genes)) %>%
+  ungroup() %>%
+  mutate(celltype = reorder(celltype, -total_genes))  
+
+ggplot(deg_counts, aes(x = celltype, y = n_genes, fill = condition)) +
+  geom_bar(stat = "identity", position = "stack") +
+  labs(
+    title = "DEGs per Cell Type by Condition",
+    x = "Cell Type",
+    y = "Number of DEGs"
+  ) +
+  scale_fill_manual(values = cbf_18_colors) +
+  theme_minimal(base_size = 14) +
+  theme(
+    axis.text.x = element_text(angle = 90, hjust = 1, color = "black"),
+    axis.text.y = element_text(color = "black"),
+    axis.title.x = element_blank(),
+    panel.border = element_rect(color = "black", fill = NA),
+    panel.grid.minor = element_blank(), 
+    text = element_text(fill = "black")
+  )
+ggsave( "Stacked_BAr_DEGCounts_per_CellType_and_Infection_total.svg",  plot = last_plot() , device = NULL, 
+        path = images, width = 8,  height = 5,  units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
+
+
+Upregulated <- all_degs_df %>%
+  filter( avg_log2FC > 0, global_padj < 0.05)
+
+deg_counts <- Upregulated %>%
+  group_by(celltype, condition) %>%
+  summarise(n_genes = n_distinct(gene), .groups = "drop")
+
+# Reorder cell types by total n_genes across conditions
+deg_counts <- deg_counts %>%
+  group_by(celltype) %>%
+  mutate(total_genes = sum(n_genes)) %>%
+  ungroup() %>%
+  mutate(celltype = reorder(celltype, -total_genes))  # negative for descending order
+
+ggplot(deg_counts, aes(x = celltype, y = n_genes, fill = condition)) +
+  geom_bar(stat = "identity", position = "stack") +
+  labs(
+    title = "Upregulated DEGs per Cell Type by Condition",
+    x = "Cell Type",
+    y = "Number of DEGs"
+  ) +
+  scale_fill_manual(values = cbf_18_colors) +
+  theme_minimal(base_size = 14) +
+  theme(
+    axis.text.x = element_text(angle = 90, hjust = 1, color = "black"),
+    axis.text.y = element_text(color = "black"),
+    axis.title.x = element_blank(),
+    panel.border = element_rect(color = "black", fill = NA),
+    panel.grid.minor = element_blank(), 
+    text = element_text(fill = "black")
+  )
+  #Figure 4A
+ggsave( "Stacked_BAr_DEGCounts_per_CellType_and_Infection_upregulated.svg",  plot = last_plot() , device = NULL, 
+        path = images, width = 8,  height = 5,  units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
+
+
+Upregulated <- all_degs_df %>%
+  filter( avg_log2FC > 0.583, global_padj < 0.05)
+
+deg_counts <- Upregulated %>%
+  group_by(celltype, condition) %>%
+  summarise(n_genes = n_distinct(gene), .groups = "drop")
+
+# Reorder cell types by total n_genes across conditions
+deg_counts <- deg_counts %>%
+  group_by(celltype) %>%
+  mutate(total_genes = sum(n_genes)) %>%
+  ungroup() %>%
+  mutate(celltype = reorder(celltype, -total_genes))  # negative for descending order
+
+ggplot(deg_counts, aes(x = celltype, y = n_genes, fill = condition)) +
+  geom_bar(stat = "identity", position = "stack") +
+  labs(
+    title = "Upregulated (logfc) DEGs per Cell Type by Condition",
+    x = "Cell Type",
+    y = "Number of DEGs"
+  ) +
+  scale_fill_manual(values = cbf_18_colors) +
+  theme_minimal(base_size = 14) +
+  theme(
+    axis.text.x = element_text(angle = 90, hjust = 1, color = "black"),
+    axis.text.y = element_text(color = "black"),
+    axis.title.x = element_blank(),
+    panel.border = element_rect(color = "black", fill = NA),
+    panel.grid.minor = element_blank(), 
+    text = element_text(fill = "black")
+  )
+  #Figure 4B
+ggsave( "Stacked_BAr_DEGCounts_per_CellType_and_Infection_upregulated_LogFC.svg",  plot = last_plot() , device = NULL, 
+        path = images, width = 8,  height = 5,  units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
+
+Downregulated <- all_degs_df %>%
+  filter( avg_log2FC < 0, global_padj < 0.05)
+
+deg_counts <- Downregulated %>%
+  group_by(celltype, condition) %>%
+  summarise(n_genes = n_distinct(gene), .groups = "drop")
+
+deg_counts <- deg_counts %>%
+  group_by(celltype) %>%
+  mutate(total_genes = sum(n_genes)) %>%
+  ungroup() %>%
+  mutate(celltype = reorder(celltype, -total_genes)) 
+
+ggplot(deg_counts, aes(x = celltype, y = n_genes, fill = condition)) +
+  geom_bar(stat = "identity", position = "stack") +
+  labs(
+    title = "Downregulated DEGs per Cell Type by Condition",
+    x = "Cell Type",
+    y = "Number of DEGs"
+  ) +
+  scale_fill_manual(values = cbf_18_colors) +
+  theme_minimal(base_size = 14) +
+  theme(
+    axis.text.x = element_text(angle = 90, hjust = 1, color = "black"),
+    axis.text.y = element_text(color = "black"),
+    axis.title.x = element_blank(),
+    panel.border = element_rect(color = "black", fill = NA),
+    panel.grid.minor = element_blank(), 
+    text = element_text(fill = "black")
+  )
+ggsave( "Stacked_BAr_DEGCounts_per_CellType_and_Infection_downregulated.svg",  plot = last_plot() , device = NULL, 
+        path = images, width = 8,  height = 5,  units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
+```
+
+
+
+```{r}
+# A Bar chart of total DEGs in ecah infection - not split by up/down regulated
+total <- all_degs_df %>%
+  filter(global_padj <0.05) %>%
+  group_by(condition) %>%
+  summarise(
+    unique_genes = n_distinct(gene),
+    .groups = "drop"
+  )
+
+ggplot(total, aes(x = unique_genes, y = condition), fill  = "black") +
+  geom_bar( stat = "identity", position = "identity") +
+  labs(
+    x = "Number of DEGs"
+  ) +
+  theme_minimal() +
+  geom_vline(xintercept = 0, color = "black") +
+  theme(
+    text = element_text(size = 14),
+    axis.title.y = element_blank(),
+    legend.position = "none"
+  )
+
+ggsave( "Total_DEG_across_Infection_BArchart_sep2025.svg",  plot = last_plot() , device = NULL, 
+        path = images, width = 6,  height = 5,  units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
+```
+
+
+
+
+#Upset plot and ontology----
+```{r}
+#Upset plot showing shared genes among those upregulated during infections across all cell types
+library(ComplexUpset)
+
+unique_deg <- all_degs_df %>%
+  filter(global_padj < 0.05 ) %>%
+  dplyr::select(gene, condition) %>%
+  distinct()
+nrow(unique_deg[unique_deg$condition == "Cryptosporidium"])
+nrow(unique_deg[unique_deg$condition == "Yersinia"])
+nrow(unique_deg[unique_deg$condition == "MNV"])
+nrow(unique_deg[unique_deg$condition == "Nippostrongylus"])
+nrow(unique_deg[unique_deg$condition == "SFB_YA"])
+nrow(unique_deg[unique_deg$condition == "Candida"])
+
+
+up_degs_df <- all_degs_df %>%
+  filter(global_padj < 0.05 & avg_log2FC > 0) %>%
+  dplyr::select(gene, condition) %>%
+  distinct()
+
+up_matrix <- up_degs_df %>%
+  mutate(present = TRUE) %>%
+  pivot_wider(names_from = condition, values_from = present, values_fill = FALSE)
+
+up_mat <- as.data.frame(up_matrix)
+rownames(up_mat) <- up_mat$gene
+up_mat$gene <- NULL
+
+
+upset(
+  up_mat,
+  intersect = colnames(up_mat),
+  name = "Upregulated Genes",
+  width_ratio = 0.2,
+  base_annotations = list(
+    'Intersection size' = intersection_size(
+      text = list(
+        angle = 90,
+        hjust = -0.5,
+        vjust = 0.5,
+        size = 3.5)) + theme(
+      panel.grid.major.x = element_blank(),
+      panel.grid.minor.x = element_blank()
+    )))
+
+
+ggsave( "Upset_upregulated_DEGS_celltype_comparisons_sep2025.svg",  plot = last_plot() , device = NULL, 
+        path = images, width = 12,  height = 5,  units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
+```
+
+```{r}
+#Save all the overlap combinations  - the up_mat has rownames as genes and colnames as conditions and is a logical matrix for whether each gene (row) is found within each cross comparison
+
+condition_names <- colnames(up_mat)
+#Create a list of all combinations 
+combinations <- unlist(lapply(1:length(condition_names), function(x) {
+  combn(condition_names, x, simplify = FALSE)
+}), recursive = FALSE)
+
+# empty excel workbook
+wb <- openxlsx::createWorkbook()
+
+for (i in seq_along(combinations)) {
+  combo <- combinations[[i]]
+  combo_name <- paste(combo, collapse = "_AND_") # By providing the index name at the beginning I can make sure all tab names are unique
+  
+  sheet_name <- substr(paste0(i, "_", combo_name), 1, 31)
+  
+   genes_in_combo <- rownames(up_mat)[apply(up_mat[, combo, drop = FALSE], 1, all) &
+    rowSums(up_mat[, setdiff(condition_names, combo), drop = FALSE]) == 0]
+  
+  if (length(genes_in_combo) > 0) {
+    addWorksheet(wb, sheetName = sheet_name)
+    
+    df_out <- data.frame(
+      Gene = genes_in_combo,
+      Comparison = paste(combo, collapse = ", "),
+      stringsAsFactors = FALSE
+    )
+    
+    writeData(wb, sheet = sheet_name, x = df_out)
+  }
+}
+
+saveWorkbook(wb, paste0(CSV, "/Upregulated_Overlap_Genes.xlsx"), overwrite = TRUE)
+```
+
+
+```{r}
+#The enterocyte development line make up the biggest chunks of DEGS in the different infections and these are interesting cells - we will focus specifically on these populations and examine the different up set plots showing how genes are arranged
+
+up_degs_df_e <- all_degs_df_entero %>%
+  filter(global_padj < 0.05, avg_log2FC >  0) %>%
+  select(gene, condition) %>%
+  distinct()
+
+up_matrix_e <- up_degs_df_e %>%
+  mutate(present = TRUE) %>%
+  pivot_wider(names_from = condition, values_from = present, values_fill = FALSE)
+
+up_mat_e <- as.data.frame(up_matrix_e)
+rownames(up_mat_e) <- up_mat_e$gene
+up_mat_e$gene <- NULL
+
+
+upset(
+  up_mat_e,
+  intersect = colnames(up_mat_e),
+  name = "Upregulated Genes Entero/Stem/Transit",
+  width_ratio = 0.2,
+  base_annotations = list(
+    'Intersection size' = intersection_size(
+      text = list(
+        angle = 90,
+        hjust =-0.5,
+        vjust = 0.5,
+        size = 3.5)) + theme(
+      panel.grid.major.x = element_blank(),
+      panel.grid.minor.x = element_blank()
+    )))
+#Figure 4C
+ggsave( "Upset_upregulated_DEGS_Entero_Stem_Transit_comparisons.svg",  plot = last_plot() , device = NULL, 
+        path = images, width = 12,  height = 5,  units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
+
+
+```
+
+# Enrichment analysis was performed utilizing a separate script and results were loaded as below
+
+#Enrichment Results 
+```{r}
+# Load in the results from the Enrichment scoring and add as metadata to the object
+hallmark <- data.table::fread("/path/to/analysis/directory/CSV/Hallmark_ssGSEA_UCell.csv")
+rownames(hallmark) <- hallmark$cell_id
+all(rownames(hallmark) %in% colnames(Ileum_filt))
+hallmark <- hallmark[,-1] # remove cell id column 
+genesets_hallmark <- colnames(hallmark)
+Ileum_filt@meta.data <- Ileum_filt@meta.data %>%
+  dplyr::select(-starts_with("HALLMARK_"))
+Ileum_filt@assays[genesets_hallmark] <- NULL
+Ileum_filt <- AddMetaData(Ileum_filt, metadata = hallmark)
+
+gs_IL27 <- data.table::fread("/path/to/analysis/directory/CSV/Il27_Ucell.csv")
+gs_IL27b <- gs_IL27
+rownames(gs_IL27) <- gs_IL27$cell_id
+all(rownames(gs_IL27) %in% colnames(Ileum_filt))
+gs_IL27 <- gs_IL27[,-1]
+genesets_gs_IL27 <- colnames(gs_IL27)
+Ileum_filt@meta.data <- Ileum_filt@meta.data %>%
+  dplyr::select(-starts_with("gs_IL27_"))
+Ileum_filt@assays[genesets_gs_IL27] <- NULL
+rownames(gs_IL27) <- gs_IL27b$cell_id
+Ileum_filt <- AddMetaData(Ileum_filt, metadata = gs_IL27)
+
+Th2 <- data.table::fread("/path/to/analysis/directory/CSV/Th2_ssGSEA_Ucell.csv")
+Th17 <- data.table::fread("/path/to/analysis/directory/CSV/Th17_ssGSEA_Ucell.csv")
+rownames(Th2) <- Th2$cell_id
+rownames(Th17) <- Th2$cell_id
+all(rownames(Th2) %in% colnames(Ileum_filt))
+Th2 <- Th2[,-1] 
+genesets_Th2 <- colnames(Th2)
+
+Ileum_filt <- AddMetaData(Ileum_filt, metadata = Th2)
+
+all(rownames(Th17) %in% colnames(Ileum_filt))
+Th17 <- Th17[, -1] 
+Th2 <- data.table::fread("/path/to/analysis/directory/CSV/Th2_ssGSEA_Ucell.csv")
+rownames(Th17) <- Th2$cell_id
+genesets_Th17 <- colnames(Th17)
+
+Ileum_filt <- AddMetaData(Ileum_filt, metadata = Th17)
+
+```
+
+
+```{r}
+#Create a data frame of the score of selected Pathways 
+pathways_interest  <- c("HALLMARK_INTERFERON_ALPHA_RESPONSE","HALLMARK_BILE_ACID_METABOLISM" , 
+         "HALLMARK_GLYCOLYSIS" , 
+         "HALLMARK_INFLAMMATORY_RESPONSE", 
+         "HALLMARK_WNT_BETA_CATENIN_SIGNALING", 
+         "HALLMARK_FATTY_ACID_METABOLISM" ,
+         "HALLMARK_IL2_STAT5_SIGNALING" , 
+         "HALLMARK_TGF_BETA_SIGNALING" ,
+         "HALLMARK_IL6_JAK_STAT3_SIGNALING" , 
+         "HALLMARK_OXIDATIVE_PHOSPHORYLATION" , 
+         "HALLMARK_TNFA_SIGNALING_VIA_NFKB" , 
+         'HALLMARK_INTERFERON_GAMMA_RESPONSE', 
+         "HALLMARK_REACTIVE_OXIGEN_SPECIES_PATHWAY", 
+         "HALLMARK_NOTCH_SIGNALING", 
+         "HALLMARK_APOPTOSIS", 
+         "HALLMARK_HYPOXIA", 
+         "BIOCARTA_GATA3_PATHWAY", 
+         "GOBP_T_HELPER_2_CELL_DIFFERENTIATION",
+         "GOBP_T_HELPER_17_CELL_DIFFERENTIATION", 
+        "HALLMARK_CHOLESTEROL_HOMEOSTASIS", 
+        "HALLMARK_ADIPOGENESIS", 
+        "HALLMARK_MTORC1_SIGNALING", 
+        "HALLMARK_PROTEIN_SECRETION", 
+        "IL27_Upregulated_mouse"
+        )
+
+table(Ileum_filt$InfectionStatus, Ileum_filt$secondlevel)
+unique(Ileum_filt$secondlevel)
+meta <- Ileum_filt@meta.data
+meta_subset <- meta %>%
+ dplyr::select(InfectionStatus, secondlevel, FineCellType, SampleType,
+         HALLMARK_INTERFERON_ALPHA_RESPONSE = HALLMARK_INTERFERON_ALPHA_RESPONSE, 
+         HALLMARK_BILE_ACID_METABOLISM = HALLMARK_BILE_ACID_METABOLISM, 
+         HALLMARK_GLYCOLYSIS =HALLMARK_GLYCOLYSIS, 
+         HALLMARK_INFLAMMATORY_RESPONSE =HALLMARK_INFLAMMATORY_RESPONSE, 
+         HALLMARK_WNT_BETA_CATENIN_SIGNALING = HALLMARK_WNT_BETA_CATENIN_SIGNALING, 
+         HALLMARK_FATTY_ACID_METABOLISM = HALLMARK_FATTY_ACID_METABOLISM,
+         HALLMARK_IL2_STAT5_SIGNALING = HALLMARK_IL2_STAT5_SIGNALING, 
+         HALLMARK_TGF_BETA_SIGNALING = HALLMARK_TGF_BETA_SIGNALING,
+         HALLMARK_IL6_JAK_STAT3_SIGNALING = HALLMARK_IL6_JAK_STAT3_SIGNALING, 
+         HALLMARK_OXIDATIVE_PHOSPHORYLATION = HALLMARK_OXIDATIVE_PHOSPHORYLATION, 
+         HALLMARK_TNFA_SIGNALING_VIA_NFKB = HALLMARK_TNFA_SIGNALING_VIA_NFKB, 
+         HALLMARK_INTERFERON_GAMMA_RESPONSE = HALLMARK_INTERFERON_GAMMA_RESPONSE,
+         HALLMARK_REACTIVE_OXIGEN_SPECIES_PATHWAY = HALLMARK_REACTIVE_OXIGEN_SPECIES_PATHWAY, 
+         HALLMARK_NOTCH_SIGNALING = HALLMARK_NOTCH_SIGNALING,
+         HALLMARK_APOPTOSIS = HALLMARK_APOPTOSIS, 
+         HALLMARK_HYPOXIA = HALLMARK_HYPOXIA, 
+         BIOCARTA_GATA3_PATHWAY = BIOCARTA_GATA3_PATHWAY, 
+         GOBP_T_HELPER_2_CELL_DIFFERENTIATION = GOBP_T_HELPER_2_CELL_DIFFERENTIATION, 
+         GOBP_T_HELPER_17_CELL_DIFFERENTIATION = GOBP_T_HELPER_17_CELL_DIFFERENTIATION, 
+         HALLMARK_CHOLESTEROL_HOMEOSTASIS = HALLMARK_CHOLESTEROL_HOMEOSTASIS,
+          HALLMARK_ADIPOGENESIS=HALLMARK_ADIPOGENESIS, 
+        HALLMARK_MTORC1_SIGNALING =HALLMARK_MTORC1_SIGNALING, 
+        HALLMARK_PROTEIN_SECRETION =HALLMARK_PROTEIN_SECRETION, 
+        IL27_Upregulated_mouse = IL27_Upregulated_mouse
+         )
+# I ended up removing any cell types in which the naive condition did not have at least 10 cells - in order to preserve the interpretability of the data
+meta_subset <- meta_subset[!meta_subset$secondlevel %in% c("Mesothelial Cells", "cDC1s", "Cycling ILCs", "Mast Cells", "Neutrophils"),]
+meta_subset <- meta_subset[!meta_subset$SampleType %in% c("Duodenum Intestinal Epithelial Cells", "Duodenum Lamina Propria"),]
+```
+
+```{r}
+library(rlang)
+cellorder <- c("Enteric Glia",  "Monocytes" , "Macrophages" , "Plasmacytoid DCs" ,   "cDC2s" , 
+               "ILC1s" , "ILC2s" ,  "ILC3s"  ,   "NK Cells"  , "NKT Cells" ,
+               "Cycling T Cells",  "CD4 ab T Cells" , "Effector CD4 ab T Cells" , "CD8 ab T Cells" , "Effector CD8 ab T Cells" ,    "gd T Cells",
+                "GC B Cells" ,  "B Cells", "Plasma Cells", 
+                  "Stem Cells" , "Transit Amplifying Cells" ,  "Enterocytes" ,  "Goblet Cells"  ,  "Tuft Cells"   ,  "Paneth Cells"   ,  "Enteroendocrine Cells" ,
+                "Lymphatic Endothelial Cells" , "Blood Endothelial Cells",   "Fibroblasts",         "Smooth Muscle Cells"   , "Stromal Cells"     )
+infectionorder <- c("Yersinia", "SFB_YA", "Nippostrongylus", "MNV", "Cryptosporidium", "Candida", "Naive")
+
+meta_subset <- meta_subset %>%
+  mutate(across(all_of(pathways_interest), as.numeric))
+heat <- list()
+for (i in pathways_interest) {
+  
+  avg_scores <- meta_subset %>%
+  group_by(InfectionStatus, secondlevel) %>%
+  summarise(mean_score = mean(!!sym(i), na.rm = TRUE), .groups = "drop")
+  
+  
+  # Scale mean_score *within* each cell type (secondlevel) across InfectionStatus
+avg_scores_scaled <- avg_scores %>%
+  group_by(secondlevel) %>%                      # scale within cell type
+  mutate(scaled_score = as.numeric(scale(mean_score))) %>%
+  ungroup()
+avg_scores_scaled$secondlevel <- factor(avg_scores_scaled$secondlevel, levels = cellorder)
+avg_scores_scaled$InfectionStatus <- factor(avg_scores_scaled$InfectionStatus, levels = infectionorder)
+
+low <-min(avg_scores_scaled$mean_score)
+max <-max(avg_scores_scaled$mean_score)
+midpoint <-(low + max) /2
+
+avg_scores$InfectionStatus <- factor(avg_scores_scaled$InfectionStatus, levels = infectionorder)
+heat[[i]] <- ggplot(avg_scores_scaled, aes(x = secondlevel, y = InfectionStatus, fill = scaled_score)) +
+  geom_tile(color =NA) +
+  scale_fill_gradient2(
+    low = "#1C75BC", mid = "grey", high = "#F7941D",
+    midpoint = midpoint,
+    name = "Scaled UCell Score"
+  ) +
+  scale_x_discrete(expand = c(0,0)) +
+  scale_y_discrete(expand = c(0,0)) +
+  labs(title = paste0(i)) +
+  theme_minimal(base_size = 12) +
+  theme(
+    axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.4, color = "black"),
+    axis.text = element_text(color = "black"),
+    axis.title = element_blank(),
+    panel.grid = element_blank(),
+    panel.border = element_rect(color = "black", fill = NA, linewidth = 0.8),
+    legend.position = "right"
+  )
+}
+
+heat[["HALLMARK_INTERFERON_ALPHA_RESPONSE"]]
+heat[["HALLMARK_BILE_ACID_METABOLISM"]]
+heat[["HALLMARK_GLYCOLYSIS"]]
+heat[["HALLMARK_INFLAMMATORY_RESPONSE"]]
+heat[["HALLMARK_WNT_BETA_CATENIN_SIGNALING"]]
+heat[["HALLMARK_FATTY_ACID_METABOLISM"]]
+heat[["HALLMARK_IL2_STAT5_SIGNALING"]]
+heat[["HALLMARK_TGF_BETA_SIGNALING"]]
+heat[["HALLMARK_IL6_JAK_STAT3_SIGNALING"]]
+heat[["HALLMARK_OXIDATIVE_PHOSPHORYLATION"]]
+heat[["HALLMARK_TNFA_SIGNALING_VIA_NFKB"]]
+heat[['HALLMARK_INTERFERON_GAMMA_RESPONSE']]
+heat[["HALLMARK_APOPTOSIS"]]
+heat[["HALLMARK_REACTIVE_OXIGEN_SPECIES_PATHWAY"]]
+heat[['HALLMARK_NOTCH_SIGNALING']]
+heat[['HALLMARK_HYPOXIA']]
+heat[['BIOCARTA_GATA3_PATHWAY']]
+heat[['GOBP_T_HELPER_2_CELL_DIFFERENTIATION']]
+heat[['GOBP_T_HELPER_17_CELL_DIFFERENTIATION']]
+heat[['HALLMARK_CHOLESTEROL_HOMEOSTASIS']]
+heat[['HALLMARK_ADIPOGENESIS']]
+heat[['HALLMARK_MTORC1_SIGNALING']]
+heat[['HALLMARK_PROTEIN_SECRETION']]
+heat[['IL27_Upregulated_mouse']]
+      
+```
+
+
+
+```{r}
+library(patchwork)
+Wnt <- heat[["HALLMARK_WNT_BETA_CATENIN_SIGNALING"]]+ theme(axis.text.x = element_blank(), 
+                                                            title = element_blank(), panel.grid = element_blank()
+                                                            )
+
+Gamma <- heat[['HALLMARK_INTERFERON_GAMMA_RESPONSE']]+theme( axis.text.x = element_blank(), title = element_blank())
+
+Bile <-heat[["HALLMARK_BILE_ACID_METABOLISM"]]+ theme( title = element_blank())
+
+
+(Gamma / Wnt / Bile) + plot_layout( heights = c(1, 1.1), nrow = 3) & 
+  theme(legend.position = "right")
+ggsave( "ssGSEA_Heatmap_Figure_v2.svg",  plot = last_plot() , device = NULL, 
+        path = images, width = 10,  height = 7,  units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
+```
+
+```{r}
+#Fgiure 3C is derived from here
+# Extract the information for Ifng to make a bubble plot showing that Crypto has increased expression
+celltype_col <- "secondlevel"   
+condition_col <- "InfectionStatus" 
+sampletype <- "SampleType"
+gene <- "Ifng"
+
+expr <- FetchData(Ileum_filt, vars = c(gene, celltype_col, condition_col, sampletype))
+expr <- expr[!expr$secondlevel %in% c("Mesothelial Cells", "cDC1s", "Cycling ILCs", "Mast Cells", "Neutrophils"),] # To match the Ucell scoring, remove cell types that have fewer than 10 cells in naive
+expr <- expr[!expr$SampleType %in% c("Duodenum Intestinal Epithelial Cells", "Duodenum Lamina Propria"),] # Remove duodenum
+unique(expr$SampleType) # check removal
+
+bubble_data <- expr %>%
+  group_by(!!sym(celltype_col), !!sym(condition_col)) %>%
+  summarise(
+    mean_expr = mean(.data[[gene]], na.rm = TRUE),                 
+    pct_expr = sum(.data[[gene]] > 0) / n() * 100            
+  ) %>%
+  ungroup()
+
+bubble_data$secondlevel <- factor(bubble_data$secondlevel, levels = rev(cellorder))
+bubble_data$InfectionStatus <- factor(bubble_data$InfectionStatus, levels =rev(c("Yersinia", "SFB_YA", "Nippostrongylus", "MNV", "Cryptosporidium", "Candida", "Naive")))
+ggplot(bubble_data, aes(x = secondlevel, y = InfectionStatus)) +
+  geom_point(aes(size = pct_expr, fill = mean_expr), color = "black", shape = 21) +
+  scale_size(range = c(1, 8)) +
+  scale_fill_gradient(low = "lightgrey", high = "navyblue") +
+  theme_minimal(base_size = 14) + theme(axis.title = element_blank(), panel.grid = element_blank(), 
+                                        panel.grid.major = element_blank(), 
+                                        panel.grid.minor = element_blank(),
+                                        axis.text = element_text(color = "black"), 
+                                        axis.text.x = element_text(angle = -90)) +
+  labs(
+    size = "% expressing",
+    fill = "Mean expression"
+  ) + coord_flip()
+# Figure 3C
+ggsave( "IfngExpression_allsamples_Fig2.svg",  plot = last_plot() , device = NULL, path = images, width = 10,  height = 11,  units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
+
+```
+
+
+
+```{r}
+#Heatmaps of relevant pathways
+#Save plots for figure 3 Figure 3D, Figure 3F, Figure 3H, Figure S4E
+
+heat[["HALLMARK_INTERFERON_ALPHA_RESPONSE"]] + theme( title = element_blank())
+ggsave("GSVA_hallmark_IFNa_AllSamples.svg", plot = last_plot() ,device = NULL,
+  path = images, scale = 1, width = 11, height = 3.5, limitsize = TRUE, bg = NULL)
+
+heat[["HALLMARK_INTERFERON_GAMMA_RESPONSE"]] + theme( title = element_blank())
+ggsave("GSVA_hallmark_IFNg_AllSamples.svg", plot = last_plot() ,device = NULL,
+  path = images, scale = 1, width = 11, height = 3.5, limitsize = TRUE, bg = NULL)
+
+
+heat[["GOBP_T_HELPER_17_CELL_DIFFERENTIATION"]] + theme( title = element_blank())
+ggsave("BoBP_Th17_Ucell_Heatmap_AllSamples.svg", plot = last_plot() ,device = NULL,
+  path = images, scale = 1, width = 11, height = 3.5, limitsize = TRUE, bg = NULL)
+
+heat[["HALLMARK_TGF_BETA_SIGNALING"]] + theme( title = element_blank())
+ggsave("Hallmark_TGFb_Ucell_Heatmap_AllSamples.svg", plot = last_plot() ,device = NULL,
+  path = images, scale = 1, width = 11, height = 3.5, limitsize = TRUE, bg = NULL)
+
+heat[["HALLMARK_HYPOXIA"]] + theme( title = element_blank())
+ggsave("HHALLMARK_HYPOXIA_Ucell_Heatmap_AllSamples.svg", plot = last_plot() ,device = NULL,
+  path = images, scale = 1, width = 11, height = 3.5, limitsize = TRUE, bg = NULL)
+```
+
+
+
+# ssGSEA Ucell ENrichments of the MLN ----
+```{r}
+
+hallmark <- data.table::fread("/path/to/analysis/directory/CSV/Hallmark_ssGSEA_UCell_MLN.csv")
+rownames(hallmark) <- hallmark$cell_id
+all(rownames(hallmark) %in% colnames(MLN_filt))
+hallmark <- hallmark[,-1] # remove cell id column 
+genesets_hallmark <- colnames(hallmark)
+MLN_filt@meta.data <- MLN_filt@meta.data %>%
+  dplyr::select(-starts_with("HALLMARK_"))
+MLN_filt@assays[genesets_hallmark] <- NULL
+MLN_filt <- AddMetaData(MLN_filt, metadata = hallmark)
+
+Th2 <- data.table::fread("/path/to/analysis/directory/CSV/Th2_ssGSEA_Ucell_MLN.csv")
+Th17 <- data.table::fread("/path/to/analysis/directory/CSV/Th17_ssGSEA_Ucell_MLN.csv")
+rownames(Th2) <- Th2$cell_id
+rownames(Th17) <- Th2$cell_id
+all(rownames(Th2) %in% colnames(MLN_filt))
+Th2 <- Th2[,-1] 
+genesets_Th2 <- colnames(Th2)
+
+MLN_filt <- AddMetaData(MLN_filt, metadata = Th2)
+
+all(rownames(Th17) %in% colnames(MLN_filt))
+Th17 <- Th17[, -1] 
+Th2 <- data.table::fread("/path/to/analysis/directory/CSV/Th2_ssGSEA_Ucell_MLN.csv")
+rownames(Th17) <- Th2$cell_id
+genesets_Th17 <- colnames(Th17)
+
+MLN_filt <- AddMetaData(MLN_filt, metadata = Th17)
+
+
+```
+
+
+```{r}
+#Create a data frame of the score of selected Pathways 
+pathways_interest  <- c("HALLMARK_INTERFERON_ALPHA_RESPONSE","HALLMARK_BILE_ACID_METABOLISM" , 
+         "HALLMARK_GLYCOLYSIS" , 
+         "HALLMARK_INFLAMMATORY_RESPONSE", 
+         "HALLMARK_WNT_BETA_CATENIN_SIGNALING", 
+         "HALLMARK_FATTY_ACID_METABOLISM" ,
+         "HALLMARK_IL2_STAT5_SIGNALING" , 
+         "HALLMARK_TGF_BETA_SIGNALING" ,
+         "HALLMARK_IL6_JAK_STAT3_SIGNALING" , 
+         "HALLMARK_OXIDATIVE_PHOSPHORYLATION" , 
+         "HALLMARK_TNFA_SIGNALING_VIA_NFKB" , 
+         'HALLMARK_INTERFERON_GAMMA_RESPONSE', 
+         "HALLMARK_REACTIVE_OXIGEN_SPECIES_PATHWAY", 
+         "HALLMARK_NOTCH_SIGNALING", 
+         "HALLMARK_APOPTOSIS", 
+         "HALLMARK_HYPOXIA", 
+        "HALLMARK_CHOLESTEROL_HOMEOSTASIS", 
+        "HALLMARK_ADIPOGENESIS", 
+        "HALLMARK_MTORC1_SIGNALING", 
+        "HALLMARK_PROTEIN_SECRETION", 
+         "BIOCARTA_GATA3_PATHWAY", 
+         "GOBP_T_HELPER_2_CELL_DIFFERENTIATION",
+         "GOBP_T_HELPER_17_CELL_DIFFERENTIATION" 
+        )
+
+table(MLN_filt$InfectionStatus, MLN_filt$secondlevel)
+unique(MLN_filt$secondlevel)
+meta <- MLN_filt@meta.data
+meta_subset <- meta %>%
+ dplyr::select(InfectionStatus, secondlevel, FineCellType,
+         HALLMARK_INTERFERON_ALPHA_RESPONSE = HALLMARK_INTERFERON_ALPHA_RESPONSE, 
+         HALLMARK_BILE_ACID_METABOLISM = HALLMARK_BILE_ACID_METABOLISM, 
+         HALLMARK_GLYCOLYSIS =HALLMARK_GLYCOLYSIS, 
+         HALLMARK_INFLAMMATORY_RESPONSE =HALLMARK_INFLAMMATORY_RESPONSE, 
+         HALLMARK_WNT_BETA_CATENIN_SIGNALING = HALLMARK_WNT_BETA_CATENIN_SIGNALING, 
+         HALLMARK_FATTY_ACID_METABOLISM = HALLMARK_FATTY_ACID_METABOLISM,
+         HALLMARK_IL2_STAT5_SIGNALING = HALLMARK_IL2_STAT5_SIGNALING, 
+         HALLMARK_TGF_BETA_SIGNALING = HALLMARK_TGF_BETA_SIGNALING,
+         HALLMARK_IL6_JAK_STAT3_SIGNALING = HALLMARK_IL6_JAK_STAT3_SIGNALING, 
+         HALLMARK_OXIDATIVE_PHOSPHORYLATION = HALLMARK_OXIDATIVE_PHOSPHORYLATION, 
+         HALLMARK_TNFA_SIGNALING_VIA_NFKB = HALLMARK_TNFA_SIGNALING_VIA_NFKB, 
+         HALLMARK_INTERFERON_GAMMA_RESPONSE = HALLMARK_INTERFERON_GAMMA_RESPONSE,
+         HALLMARK_REACTIVE_OXIGEN_SPECIES_PATHWAY = HALLMARK_REACTIVE_OXIGEN_SPECIES_PATHWAY, 
+         HALLMARK_NOTCH_SIGNALING = HALLMARK_NOTCH_SIGNALING,
+         HALLMARK_APOPTOSIS = HALLMARK_APOPTOSIS, 
+         HALLMARK_HYPOXIA = HALLMARK_HYPOXIA, 
+         HALLMARK_CHOLESTEROL_HOMEOSTASIS = HALLMARK_CHOLESTEROL_HOMEOSTASIS,
+          HALLMARK_ADIPOGENESIS=HALLMARK_ADIPOGENESIS, 
+        HALLMARK_MTORC1_SIGNALING =HALLMARK_MTORC1_SIGNALING, 
+        HALLMARK_PROTEIN_SECRETION =HALLMARK_PROTEIN_SECRETION, 
+         BIOCARTA_GATA3_PATHWAY =BIOCARTA_GATA3_PATHWAY , 
+         GOBP_T_HELPER_2_CELL_DIFFERENTIATION=GOBP_T_HELPER_2_CELL_DIFFERENTIATION,
+         GOBP_T_HELPER_17_CELL_DIFFERENTIATION=GOBP_T_HELPER_17_CELL_DIFFERENTIATION 
+         )
+# I ended up removing any cell types in which the naive condition did not have at least 10 cells - in order to preserve the interpretability of the data
+meta_subset <- meta_subset[!meta_subset$secondlevel %in% c("Mesothelial Cells", "Basophils", "Lymphatic Endothelial Cells", "Blood Endothelial Cells", "Fibroblasts", "Neutrophils"),]
+```
+
+```{r}
+library(rlang)
+unique(MLN_filt$secondlevel)
+cellorder <- c( "Monocytes" , "Macrophages" ,"Plasmacytoid DCs"   ,   "cDC2s" ,  "cDC1s",
+               "ILC1s" , "ILC2s" ,  "ILC3s"  ,   "NK Cells"  , "NKT Cells" ,
+               "Cycling T Cells",  "CD4 ab T Cells" , "Effector CD4 ab T Cells" ,"Memory CD4 ab T Cells"  , "CD8 ab T Cells" , "Effector CD8 ab T Cells" ,    "gd T Cells",
+                "GC B Cells" ,  "B Cells",    "Memory B cells"   ,"Plasma Cells"  )
+
+infectionorder <- c("Yersinia", "SFB_YA", "Nippostrongylus", "MNV", "Cryptosporidium", "Candida", "Naive")
+
+meta_subset <- meta_subset %>%
+  mutate(across(all_of(pathways_interest), as.numeric))
+heat_mln <- list()
+for (i in pathways_interest) {
+  
+  avg_scores <- meta_subset %>%
+  group_by(InfectionStatus, secondlevel) %>%
+  summarise(mean_score = mean(!!sym(i), na.rm = TRUE), .groups = "drop")
+  
+  
+  # Scale mean_score *within* each cell type (secondlevel) across InfectionStatus
+avg_scores_scaled <- avg_scores %>%
+  group_by(secondlevel) %>%                     
+  mutate(scaled_score = as.numeric(scale(mean_score))) %>%
+  ungroup()
+avg_scores_scaled$secondlevel <- factor(avg_scores_scaled$secondlevel, levels = cellorder)
+avg_scores_scaled$InfectionStatus <- factor(avg_scores_scaled$InfectionStatus, levels = infectionorder)
+
+low <-min(avg_scores_scaled$mean_score)
+max <-max(avg_scores_scaled$mean_score)
+midpoint <-(low + max) /2
+
+avg_scores$InfectionStatus <- factor(avg_scores_scaled$InfectionStatus, levels = infectionorder)
+heat_mln[[i]] <- ggplot(avg_scores_scaled, aes(x = secondlevel, y = InfectionStatus, fill = scaled_score)) +
+  geom_tile(color =NA) +
+  scale_fill_gradient2(
+     low = "#1C75BC", mid = "grey", high = "#F7941D",
+    midpoint = midpoint,
+    name = "Scaled UCell Score"
+  ) +
+  scale_x_discrete(expand = c(0,0)) +
+  scale_y_discrete(expand = c(0,0)) +
+  labs(title = paste0(i)) +
+  theme_minimal(base_size = 12) +
+  theme(
+    axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.4, color = "black"),
+    axis.text = element_text(color = "black"),
+    axis.title = element_blank(),
+    panel.grid = element_blank(),
+    panel.border = element_rect(color = "black", fill = NA, linewidth = 0.8),
+    legend.position = "right"
+  )
+}
+
+heat_mln[["HALLMARK_INTERFERON_ALPHA_RESPONSE"]]
+heat_mln[["HALLMARK_BILE_ACID_METABOLISM"]]
+heat_mln[["HALLMARK_GLYCOLYSIS"]]
+heat_mln[["HALLMARK_INFLAMMATORY_RESPONSE"]]
+heat_mln[["HALLMARK_WNT_BETA_CATENIN_SIGNALING"]]
+heat_mln[["HALLMARK_FATTY_ACID_METABOLISM"]]
+heat_mln[["HALLMARK_IL2_STAT5_SIGNALING"]]
+heat_mln[["HALLMARK_TGF_BETA_SIGNALING"]]
+heat_mln[["HALLMARK_IL6_JAK_STAT3_SIGNALING"]]
+heat_mln[["HALLMARK_OXIDATIVE_PHOSPHORYLATION"]]
+heat_mln[["HALLMARK_TNFA_SIGNALING_VIA_NFKB"]]
+heat_mln[['HALLMARK_INTERFERON_GAMMA_RESPONSE']]
+heat_mln[["HALLMARK_APOPTOSIS"]]
+heat_mln[["HALLMARK_REACTIVE_OXIGEN_SPECIES_PATHWAY"]]
+heat_mln[['HALLMARK_NOTCH_SIGNALING']]
+heat_mln[['HALLMARK_HYPOXIA']]
+heat_mln[['BIOCARTA_GATA3_PATHWAY']]
+heat_mln[['GOBP_T_HELPER_2_CELL_DIFFERENTIATION']]
+heat_mln[['GOBP_T_HELPER_17_CELL_DIFFERENTIATION']]
+heat_mln[['HALLMARK_CHOLESTEROL_HOMEOSTASIS']]
+heat_mln[['HALLMARK_ADIPOGENESIS']]
+heat_mln[['HALLMARK_MTORC1_SIGNALING']]
+heat_mln[['HALLMARK_PROTEIN_SECRETION']]
+heat_mln[['IL27_Upregulated_mouse']]
+      
+```
+
+```{r}
+##Figure 3E, Figure 3G 
+heat_mln[["HALLMARK_INTERFERON_GAMMA_RESPONSE"]] + theme( title = element_blank())
+ggsave("HAllmark_IFNG_Ucell_Heatmap_AllSamples_MLN.svg", plot = last_plot() ,device = NULL,
+  path = images, scale = 1, width = 8, height = 3.5, limitsize = TRUE, bg = NULL)
+
+
+heat_mln[["GOBP_T_HELPER_17_CELL_DIFFERENTIATION"]] + theme( title = element_blank())
+ggsave("GOBP_T_HELPER_17_CELL_Ucell_Heatmap_AllSamples_MLN.svg", plot = last_plot() ,device = NULL,
+  path = images, scale = 1, width = 8, height = 3.5, limitsize = TRUE, bg = NULL)
+```
+
+
+
+
+#Supplement Graphing 
+```{r}
+#Figure S4A, Figure S4B, Figure S4C, Figure S4D
+Correctcolors <- c(  "#B78CBA",   "#1170AA",  
+  "#FCB13F",  
+  "#60BFC1",  
+  "#EF6F6A",  
+    "#937860", 
+  "#D17A00",   )
+meta <- Ileum_filt_i@meta.data %>%
+  dplyr::select(Mouse, InfectionStatus, secondlevel)
+
+# Compute frequency per mouse and cell type
+freq_data <- meta %>%
+  group_by(InfectionStatus, secondlevel) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  group_by(InfectionStatus) %>%
+  mutate(freq = n / sum(n)) %>%
+  ungroup()
+unique(freq_data$InfectionStatus)
+freq_data <- freq_data %>%
+  mutate(
+    InfectionStatus = factor(
+      InfectionStatus,
+      levels = c("Naive", "Candida", "Cryptosporidium", "MNV",
+                 "Nippostrongylus", "SFB_YA", "Yersinia")))
+cell_types <- c("Monocytes", "Goblet Cells", "Neutrophils", "Tuft Cells")
+
+plots <- lapply(cell_types, function(ct) {
+  ggplot(filter(freq_data, secondlevel == ct),
+         aes(x = InfectionStatus, y = freq, fill = InfectionStatus)) +
+    geom_bar(stat = "identity", position = "dodge") +
+    labs(
+      title = ct,
+      y = "Fraction of cells",
+      x = "Infection"
+    ) +
+    scale_y_continuous(expand = expansion(mult = c(0, 0.05))) +
+    scale_fill_manual(values = Correctcolors) +
+    theme_classic(base_size = 12) +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      
+    )
+})
+
+# Combine all 4 plots in a grid
+wrap_plots(plots, ncol = 2)
+
+plots[[1]] + theme(axis.title.x = element_blank(), 
+                   plot.title = element_blank(),
+                   axis.text = element_text(color = "black"))
+ggsave("Monocyte_frequency_Ileum_By_Infection.svg", plot = last_plot(), path = images, width = 6, height = 4)
+
+plots[[2]] + theme(axis.title.x = element_blank(), 
+                   plot.title = element_blank(),
+                   axis.text = element_text(color = "black"))
+ggsave("GobletCells_frequency_Ileum_By_Infection.svg", plot = last_plot(), path = images, width = 6, height = 4)
+
+plots[[3]] + theme(axis.title.x = element_blank(), 
+                   plot.title = element_blank(),
+                   axis.text = element_text(color = "black"))
+ggsave("Neutrophils_frequency_Ileum_By_Infection.svg", plot = last_plot(), path = images, width = 6, height = 4)
+
+plots[[4]] + theme(axis.title.x = element_blank(), 
+                   plot.title = element_blank(),
+                   axis.text = element_text(color = "black"))
+ggsave("Tuftcells_frequency_Ileum_By_Infection.svg", plot = last_plot(), path = images, width = 6, height = 4)
+
+                   
+                   
+```
