@@ -123,7 +123,7 @@ Downsampled data are available for direct exploration utilizing CellxGene VIP an
 
 For questions or collaboration:  
 
-📧 gutpath@upenn.edu  
+📧 hartand@upenn.edu  
 🌐 [GutPath.org](https://gutpath.org)  
 
 > *This atlas enables research into mucosal immunology and epithelial plasticity during infection.*
