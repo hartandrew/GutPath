@@ -8,9 +8,9 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
-# Description: This script focuses on the ENterocyte lineage within the MIST data. Pseudotime is performed as well as pseudotime modeled DEG analysis via Tradeseq
+# Description: This script focuses on the Enterocyte lineage within the MIST data. Pseudotime is performed as well as pseudotime modeled DEG analysis via Tradeseq
 # Investigations of the distinct Yersinia subset of enterocytes are performed and graphed 
-# Figures produced: Figure S6C, Figure 6A, Figure 4D, #Figure S5C, Figure 4F, #Figure 4G, Figure 4H, Figure 6B, Figure S6A, Figure S6B , Figure 6C, Figure 6E, Figure 6D, Figure S5B, Figure 6F, Figure S6D
+# Figures produced: Figure S6C, Figure 6A, Figure 4D, #Figure S5C, Figure 4F, #Figure 4G, Figure 4H, Figure 6B, Figure S7A, Figure S7B , Figure 6C, Figure 6E, Figure 6D, Figure S5B, Figure 6F, Figure S7D, Figure S5D-F
 #Load Libraries 
 ```{r}
 library(Seurat)
@@ -96,7 +96,7 @@ EpiCellTypes <- c( "Enterocytes", "Goblet Cells", "Paneth Cells", "Enteroendocri
 #Load Objects
 ```{r}
 
-#MLN_filt <- qs_read("/path/to/analysis/directory/Seurat_Files/Analysis2_MLN_clustered_annotated.qs2")
+MLN_filt <- qs_read("/path/to/analysis/directory/Seurat_Files/Analysis2_MLN_clustered_annotated.qs2")
 Ileum_filt <- qs_read("/path/to/analysis/directory/Seurat_Files/Analysis2.5_Ileum.qs2")
 Ileum_Epithelial <- qs_read("/path/to/analysis/directory/Seurat_Files/Ileum_Epithelial_intermediate.qs2")
 
@@ -174,7 +174,7 @@ DimPlot(Ileum_filt, reduction = "wnn.umap_cc",combine = FALSE, cells.highlight =
 
 
 # Graph the frequency of the Yersinia specific subset fo enterocytes 
-# Figure S6C
+# Figure S7C
 saa1_cells <- subset(Ileum_Epithelial2, subset = FinestCellType == "Saa1 inflammatory Enterocytes")
 
 # Count how many cells per InfectionStatus
@@ -864,7 +864,7 @@ entero_solutes <- pheatmap(gene_matrix,
          #annotation_col = annotation_col,  
          annotation_colors = list(cell_type = cell_type_colors), 
          color = colorRampPalette(brewer.pal(9, "Blues"))(100),  
-         border_color = NA,           # Optional: remove borders around cells
+         border_color = NA,           
          fontsize = 10,              
          height = 8,                  
          width = 10,                  
@@ -1009,7 +1009,6 @@ SLC_naive <- pheatmap(yhat_enterocyte_scaled_ordered,
                       border_color = NA)
 
 # Save to SVG
-#Figure 4G
 library(svglite)
 svglite(paste0(images, "/Naive_Heatmap_SLC_genes_Pseudotime_Manual.svg"), width = 2, height = 6)
 SLC_naive
@@ -1030,6 +1029,209 @@ yhat_enterocyte_scaled <- t(scale(t(yhat_enterocyte)))
           fontsize_row = 7,  border_color = NA)
 
 ```
+
+
+```{r}
+#ontology of the Genes that are altered with pseudotime. Importantly, proliferation will clearly dominate this list because of changes in the rapidly dividing cells near the crypt. However, we seek to see what else is uncovered and whether metabolism and transport are highly featured
+
+library(gprofiler2)
+library(ggrepel)
+
+
+gostres <- gost(
+  query = sig_genes_modeled_naive,
+  organism = "mmusculus",    
+  sources = c("GO:BP"),     
+  correction_method = "fdr", 
+  significant = F, evcodes = TRUE
+)
+
+gostplot(gostres, capped = TRUE, interactive = FALSE)
+
+gost_df <- gostres$result %>%
+  mutate(across(where(is.list), ~ sapply(., function(x) paste(x, collapse = "; ")))) %>%
+  filter(term_size > 20 & term_size < 2000) %>%
+  arrange(p_value) %>%
+  mutate(sig = ifelse(p_value < 0.01, "Significant", "Not Significant"))
+write.csv(gost_df, paste0(CSV, "/Tradeseq_Naive_pseudotime_enterocytes_GOBP_results.csv"))
+
+# The results point to cell cycle as predicted. However, there are a fair number of transport related gene processes. 
+# Separate out the specific transport related pathways 
+
+
+
+
+transport_pathways <- c("nitrogen compound transport", "protein transport", "nucleic acid transport",  "transmembrane transport", "nucleobase-containing compound transport")
+Metabolic_paths <- c("small molecule metabolic process", "oxoacid metabolic process", "carboxylic acid metabolic process", "organic acid metabolic process", "lipid metabolic process")
+
+gost_df_transport <- gost_df[gost_df$term_name %in% c(transport_pathways,Metabolic_paths),]
+gost_df_transport$type <- ifelse(gost_df_transport$term_name %in% transport_pathways, "Transport", "Metabolic")
+ggplot(gost_df_transport, aes(x = reorder(term_name, -log10(p_value)), y = -log10(p_value), fill = type)) +
+  geom_col(color = "black") +
+  scale_fill_manual(values = c("Transport" =  "#B3B3B3",  "Metabolic" = "#CCB974")) +
+  geom_hline(yintercept = -log10(0.01), linetype = "dashed", color = "black") +
+  labs(title = "Selected Enriched Transport Pathways",
+    x = "Term ID",
+    y = "-log10(p-value)") +
+  theme(panel.background = element_rect(fill = "white", color = NA),
+        #plot.background = element_rect(fill = "white", color = NA),
+    axis.title.y = element_blank(),
+    panel.grid.major = element_line(color = "lightgrey"),
+     panel.grid.minor  = element_blank(),
+    legend.position = "bottom", 
+    panel.border = element_rect(color = "black")
+  ) + coord_flip()
+# Figure S5D
+ggsave( "Naive_tradeseq_Genes_Ontology_GOBP_Trasnport_selected.svg",  plot = last_plot() , device = NULL, 
+        path = images, width =8,  height = 5,  units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
+
+
+#Make Heatmaps of the Unique genes contained within the metabolic and transport groups 
+
+#Figure S5E Figure S5F below
+gost_df_transport <- gost_df[gost_df$term_name %in% c(transport_pathways),]
+TransportGenes <- gost_df_transport$intersection
+TransportGenes_vec <- unique(trimws(unlist(strsplit(TransportGenes, ","))))
+
+yhat <- predictSmooth(sce_naive, gene = TransportGenes_vec, nPoints = 50, tidy = FALSE)
+yhat_scaled <- t(scale(t(yhat)))
+
+minmax_scale <- function(x) {
+  if (max(x) == min(x)) return(rep(0, length(x)))  # avoid division by zero
+  (x - min(x)) / (max(x) - min(x))
+}
+yhat_scaled <- t(apply(yhat, 1, minmax_scale))
+library(pheatmap)
+pheatmap(yhat_scaled, cluster_cols = FALSE, show_colnames = FALSE, show_rownames = F,
+         main = "Naive - Pseudotime Dynamics", fontsize_row = 6)
+
+# 637 uniuque Genes in the selected transport related ontologies 
+# Find the center mass and reorder the gene accordingly so that they flow against pseudotime
+k <- 5
+library(zoo)
+mat_smooth <- t(apply(yhat_scaled, 1, function(x) {
+  rollmean(x, k = k, fill = "extend", align = "center")
+}))
+
+peak_pos <- apply(mat_smooth, 1, which.max)
+mat_ordered <- yhat_scaled[order(peak_pos), ]
+pheatmap(mat_ordered, cluster_cols = FALSE, show_colnames = FALSE, show_rownames = F, cluster_rows = F,
+         main = "Naive - Pseudotime Dynamics", fontsize_row = 6)
+
+# Plot the heatmap
+SLC_naive_transport <- pheatmap(mat_ordered,
+                      cluster_cols = FALSE, 
+                      cluster_rows = FALSE,  # don't re-cluster now that it's ordered
+                      show_rownames = F, 
+                      show_colnames = FALSE, 
+                      treeheight_row = 0,   
+                      treeheight_col = 0,
+                      fontsize_row = 7,  
+                      border_color = NA)
+SLC_naive_transport
+library(svglite)
+svglite(paste0(images, "/Naive_Heatmap_Transport_Genes_Ordered.svg"), width = 2, height = 7)
+SLC_naive_transport
+dev.off()
+
+gost_df_metabolic <- gost_df[gost_df$term_name %in% c(Metabolic_paths),]
+metabolicGenes <- gost_df_metabolic$intersection
+metabolicGenes_vec <- unique(trimws(unlist(strsplit(metabolicGenes, ","))))
+
+yhat <- predictSmooth(sce_naive, gene = metabolicGenes_vec, nPoints = 50, tidy = FALSE)
+yhat_scaled <- t(scale(t(yhat)))
+
+yhat_scaled <- t(apply(yhat, 1, minmax_scale))
+
+
+pheatmap(yhat_scaled, cluster_cols = FALSE, show_colnames = FALSE, show_rownames = F,
+         main = "Naive - Pseudotime Dynamics", fontsize_row = 6)
+
+# 624 uniuque Genes in the selected metabolic related ontologies 
+# Find the center mass and reorder the gene accordingly so that they flow against pseudotime
+k <- 5
+library(zoo)
+mat_smooth <- t(apply(yhat_scaled, 1, function(x) {
+  rollmean(x, k = k, fill = "extend", align = "center")
+}))
+
+peak_pos <- apply(mat_smooth, 1, which.max)
+mat_ordered <- yhat_scaled[order(peak_pos), ]
+pheatmap(mat_ordered, cluster_cols = FALSE, show_colnames = FALSE, show_rownames = F, cluster_rows = F,
+         main = "Naive - Pseudotime Dynamics", fontsize_row = 6)
+
+# Plot the heatmap
+SLC_naive_metabolic <- pheatmap(mat_ordered,
+                      cluster_cols = FALSE, 
+                      cluster_rows = FALSE,  # don't re-cluster now that it's ordered
+                      show_rownames = F, 
+                      show_colnames = FALSE, 
+                      treeheight_row = 0,   
+                      treeheight_col = 0,
+                      fontsize_row = 7,  
+                      border_color = NA)
+SLC_naive_metabolic
+library(svglite)
+svglite(paste0(images, "/Naive_Heatmap_metabolic_Genes_Ordered.svg"), width = 2, height = 7)
+SLC_naive_metabolic
+dev.off()
+
+
+# now plot specifically the SLC Genes given their 
+# how many slc genes are within the modeled genes 
+ #model_genes_n <- rownames(sce_naive)
+ #temp_slc_list <- grep("^(Slc)", model_genes, value = TRUE)
+
+selected_temp_naive_slc <- grep("^(Slc)", sig_genes_modeled_naive, value = TRUE)# Get genes starting with "Slc" or "Cyp"
+genes_help <- assoc_res[rownames(assoc_res) %in% selected_temp_naive_slc,] # 82 genes
+
+yhat <- predictSmooth(sce_naive, gene = rownames(genes_help), nPoints = 50, tidy = FALSE)
+
+yhat_scaled <- t(apply(yhat, 1, minmax_scale))
+pheatmap(yhat_scaled, cluster_cols = FALSE, show_colnames = FALSE, show_rownames = F,
+         main = "Naive - Pseudotime Dynamics", fontsize_row = 6)
+
+# 82 unique Genes in the selected SLC  
+# Find the center mass and reorder the gene accordingly so that they flow against pseudotime
+k <- 3
+library(zoo)
+mat_smooth <- t(apply(yhat_scaled, 1, function(x) {
+  rollmean(x, k = k, fill = "extend", align = "center")
+}))
+
+peak_pos <- apply(mat_smooth, 1, which.max)
+mat_ordered <- yhat_scaled[order(peak_pos), ]
+pheatmap(mat_ordered, cluster_cols = FALSE, show_colnames = FALSE, show_rownames = F, cluster_rows = F,
+         main = "Naive - Pseudotime Dynamics", fontsize_row = 6)
+
+# Plot the heatmap
+# Figure 4G 
+SLC_naive_SLC <- pheatmap(mat_ordered,
+                      cluster_cols = FALSE, 
+                      cluster_rows = F,  # don't re-cluster now that it's ordered
+                      show_rownames = T, 
+                      show_colnames = FALSE, 
+                      treeheight_row = 0,   
+                      treeheight_col = 0,
+                      fontsize_row = 7,  
+                      border_color = NA)
+SLC_naive_SLC
+library(svglite)
+svglite(paste0(images, "/Naive_Heatmap_all_sig_SLC_Genes_Ordered.svg"), width = 2, height = 7)
+SLC_naive_SLC
+dev.off()
+
+
+
+
+```
+
+
+
+
+
+
+
 
 ```{r}
 #Differential Expression across pseudotime - by condition/infection in the enterocyte lineage
@@ -1194,7 +1396,7 @@ sig_gene_list <- rownames(deg_genes_epi)[deg_genes_epi$padj_conds1vs4 <= 0.05 |
 
 
 EnterocyteGenes_list <- EnterocyteGenes$Gene
-EnterocyteGenes_list <- c(EnterocyteGenes_list, "Slc5a12", "Slc16a12", "Slc13a1", )
+EnterocyteGenes_list <- c(EnterocyteGenes_list, "Slc5a12", "Slc16a12", "Slc13a1" )
 selected_genes <- grep("^(Slc|Cyp)", sig_gene_list, value = TRUE)# Get genes starting with "Slc" or "Cyp"
 EnterocyteGenes_list2 <- c(EnterocyteGenes_list,selected_genes)
 genes_to_heat <- sig_gene_list[sig_gene_list %in% EnterocyteGenes$Gene] # selecting only genes from the targeted list to graph
@@ -1270,6 +1472,251 @@ grid.arrange(heatSmooth_Naive[[4]], heatSmooth_Candida[[4]], heatSmooth_Crypto[[
 dev.off()
 
 ```
+
+```{r}
+# Figure 4H Infection specific changes to SLC genes  
+# Isolate the Genes to examine
+infection_slc_genes <-  sig_gene_list[sig_gene_list %in% rownames(genes_help)] #29 Genes
+yhatSmooth <- predictSmooth(sce, gene = infection_slc_genes, nPoints = 50, tidy = FALSE)
+minmax_scale <- function(x) {
+  if (max(x) == min(x)) return(rep(0, length(x)))  # avoid division by zero
+  (x - min(x)) / (max(x) - min(x))
+}
+# Apply to each row
+yhatSmoothScaled <- t(apply(yhatSmooth, 1, minmax_scale))
+
+# Find the order of the genes based on their expression in Naive
+mat <- yhatSmooth[,151:200]
+k <- 5
+library(zoo)
+mat_smooth <- t(apply(mat, 1, function(x) {
+  rollmean(x, k = k, fill = "extend", align = "center")
+}))
+
+peak_pos <- apply(mat_smooth, 1, which.max)
+mat_ordered <- yhatSmoothScaled[order(peak_pos), ]
+gene_order_slc <- rownames(mat_ordered)
+
+# Flip the HEatmap to make the genes more comparable across the different infections 
+conditions <- c(
+  "Naive",
+  "Candida",
+  "Cryptosporidium",
+  "MNV",
+  "Nippostrongylus",
+  "SFB",
+  "Yersinia"
+)
+
+cond_cols <- list(
+    Naive = 151:200,
+  Candida = 1:50,
+  Cryptosporidium = 51:100,
+  MNV = 101:150,
+
+  Nippostrongylus = 201:250,
+  SFB = 251:300,
+  Yersinia = 301:350
+)
+
+gene_heatmaps <- lapply(rownames(yhatSmoothScaled), function(gene) {
+
+  mat <- do.call(
+    rbind,
+    lapply(conditions, function(cond) {
+      yhatSmoothScaled[gene, cond_cols[[cond]]]
+    })
+  )
+
+  rownames(mat) <- conditions
+  colnames(mat) <- paste0("pt", 1:50)
+
+  mat
+})
+
+
+names(gene_heatmaps) <- rownames(yhatSmoothScaled) # gives the gene names to each new entry made
+dim(gene_heatmaps[[1]])
+dim(gene_heatmaps[[29]]) # there are 29 as there should be
+rownames(gene_heatmaps[[1]])
+
+genes_present <- gene_order_slc[gene_order_slc %in% names(gene_heatmaps)]
+gene_heatmaps <- gene_heatmaps[genes_present]
+
+library(pheatmap)
+n <- length(gene_heatmaps)
+half <- ceiling(n / 2)
+rownames_idx <- c(1, half + 1)
+
+breaks <- seq(0, 1, length.out = 101)
+
+gene_plots <- lapply(seq_along(gene_heatmaps), function(i) {
+
+  gene <- names(gene_heatmaps)[i]
+
+  pheatmap(
+    gene_heatmaps[[gene]],
+    cluster_rows = FALSE,
+    cluster_cols = FALSE,
+    show_rownames = i %in% rownames_idx,
+    show_colnames = FALSE,
+    breaks = breaks,
+    main = gene,
+    border_color = NA,
+    legend = FALSE,
+    fontsize_row = 10,
+    silent = TRUE
+  )[[4]]
+})
+
+n <- length(gene_plots)
+
+widths <- c(2, rep(1, n - 1))  # first plot wider for rownames
+
+grid.arrange(
+  grobs = gene_plots,
+  nrow = 2,
+  widths = widths
+)
+
+n <- length(gene_plots)
+half <- ceiling(n / 2)
+
+row1 <- gene_plots[1:half]
+row2 <- gene_plots[(half + 1):n]
+
+widths_row1 <- c(2, rep(1, length(row1) - 1))
+widths_row2 <- c(2, rep(1, length(row2) - 1))
+
+p <- grid.arrange(
+  arrangeGrob(grobs = row1, nrow = 1, widths = widths_row1),
+  arrangeGrob(grobs = row2, nrow = 1, widths = widths_row2),
+  ncol = 1
+)
+p 
+# Figure 4H
+pdf(paste0(images, "/gene_condition_pseudotime_heatmaps_Fig4H.pdf"), width = 12, height = 5)
+grid.arrange(
+  arrangeGrob(grobs = row1, nrow = 1, widths = widths_row1),
+  arrangeGrob(grobs = row2, nrow = 1, widths = widths_row2),
+  ncol = 1
+)
+dev.off()
+
+```
+
+
+```{r}
+
+Geneorder <- c("Slco3a1", "Slc1a5", "Slc2a1", "Cftr", "Slc25a39", "Slc6a6", "Slc1a1", "Slc20a1", "Fabp6", "Slc51a", "Slc51b", "Dhrs9", 
+                "Slc13a1", "Slc10a2", "Slc28a1", "Apoc2", "Apoc3", "Acsl3", "Apoa4", "Slc28a2")
+# Flip the HEatmap to make the genes more comparable across the different infections 
+conditions <- c(
+  "Naive",
+  "Candida",
+  "Cryptosporidium",
+  "MNV",
+  "Nippostrongylus",
+  "SFB",
+  "Yersinia"
+)
+
+cond_cols <- list(
+    Naive = 151:200,
+  Candida = 1:50,
+  Cryptosporidium = 51:100,
+  MNV = 101:150,
+
+  Nippostrongylus = 201:250,
+  SFB = 251:300,
+  Yersinia = 301:350
+)
+
+gene_heatmaps <- lapply(rownames(yhatSmoothScaled), function(gene) {
+
+  mat <- do.call(
+    rbind,
+    lapply(conditions, function(cond) {
+      yhatSmoothScaled[gene, cond_cols[[cond]]]
+    })
+  )
+
+  rownames(mat) <- conditions
+  colnames(mat) <- paste0("pt", 1:50)
+
+  mat
+})
+
+
+names(gene_heatmaps) <- rownames(yhatSmoothScaled) # gives the gene names to each new entry made
+dim(gene_heatmaps[[1]])
+rownames(gene_heatmaps[[1]])
+
+genes_present <- Geneorder[Geneorder %in% names(gene_heatmaps)]
+gene_heatmaps <- gene_heatmaps[genes_present]
+
+library(pheatmap)
+n <- length(gene_heatmaps)
+half <- ceiling(n / 2)
+rownames_idx <- c(1, half + 1)
+
+breaks <- seq(0, 1, length.out = 101)
+
+gene_plots <- lapply(seq_along(gene_heatmaps), function(i) {
+
+  gene <- names(gene_heatmaps)[i]
+
+  pheatmap(
+    gene_heatmaps[[gene]],
+    cluster_rows = FALSE,
+    cluster_cols = FALSE,
+    show_rownames = i %in% rownames_idx,
+    show_colnames = FALSE,
+    breaks = breaks,
+    main = gene,
+    border_color = NA,
+    legend = FALSE,
+    fontsize_row = 10,
+    silent = TRUE
+  )[[4]]
+})
+
+n <- length(gene_plots)
+
+widths <- c(2, rep(1, n - 1))  # first plot wider for rownames
+
+grid.arrange(
+  grobs = gene_plots,
+  nrow = 2,
+  widths = widths
+)
+
+n <- length(gene_plots)
+half <- ceiling(n / 2)
+
+row1 <- gene_plots[1:half]
+row2 <- gene_plots[(half + 1):n]
+
+widths_row1 <- c(2, rep(1, length(row1) - 1))
+widths_row2 <- c(2, rep(1, length(row2) - 1))
+
+p <- grid.arrange(
+  arrangeGrob(grobs = row1, nrow = 1, widths = widths_row1),
+  arrangeGrob(grobs = row2, nrow = 1, widths = widths_row2),
+  ncol = 1
+)
+p 
+
+pdf(paste0(images, "/gene_condition_pseudotime_heatmaps_Fig4.pdf"), width = 12, height = 5)
+grid.arrange(
+  arrangeGrob(grobs = row1, nrow = 1, widths = widths_row1),
+  arrangeGrob(grobs = row2, nrow = 1, widths = widths_row2),
+  ncol = 1
+)
+dev.off()
+
+```
+
 
 ```{r}
 genes_to_plot_all <- genes_to_plot_naive[genes_to_plot_naive %in% rownames(sce)]
@@ -1761,7 +2208,7 @@ heatSmooth_Naive <- pheatmap(yhatSmoothScaled[heatSmooth_Yersinia$tree_row$order
 
 grid.arrange(heatSmooth_Naive[[4]],  heatSmooth_Yersinia1[[4]], ncol = 2, widths=c(1, 1.35))
 library(svglite)
-#Figure S6A
+#Figure S7A
 svglite(paste0(images, "/Yersinia_and_Naive_Enterocyte_Genes_HEat_Tradeseq.svg"), width = 5, height = 6)
 grid.arrange(heatSmooth_Naive[[4]],  heatSmooth_Yersinia[[4]], ncol = 2, widths=c(1, 1.6))
 dev.off()
@@ -1942,7 +2389,7 @@ p <-ggplot(umap_data2, aes(x = wnnepithelialumap_1, y = wnnepithelialumap_2, col
     axis.title = element_blank()
   ) 
 p
-#Figure S6B and Figure 6C
+#Figure S7B and Figure 6C
 ggsave( "Yersinia_UCell_YP_ENterocyte_Genes_Umap_abbrev.svg",  plot = last_plot() , device = NULL, 
         path = images, width =6,  height = 5,  units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
 
@@ -2279,7 +2726,7 @@ ggraph(g, layout = "fr") +
   theme_void()
 
 # Save as SVG
-#Figure S6D
+#Figure S7D
 ggsave(paste0(images, "/Top_TF_network.svg"), width = 10, height = 8) # Srbp1
 
 
@@ -2437,6 +2884,9 @@ dev.off()
 
 ```
 
+
+
+
 #Export Data for scCellfie H5ad
 ```{r}
 
@@ -2455,6 +2905,757 @@ DefaultAssay(Ileum_temp) <- "RNA"
 sceasy::convertFormat(Ileum_temp, from = "seurat", to = "anndata", main_layer = "counts",  outFile = "/path/to/analysis/directory/Seurat_Files/Analysis2.7_Ileum_counts_scCellfie.h5ad")
 
 ```
+
+#Test for IL4 stimulated Enrichment in the Gene signature
+```{r}
+#Our sccellfie and cell-cell communication results suggest that enterocytes from nippostrongylus have an altered metabolic profile and might be responding to Il4 or IL13. We want to test whether there is a connection between these in silico. 
+# Previously, others have stimulated intestinal organoids with IL4 and performed RNAseq. We can test whether our transcriptional data might reflect these changes.
+#I could Isolate the genes from the enriched pathways (Figure 5B) and test whether they have a STAT6 signature 
+
+# Load the Task by gene information from sccellfie (from their Github)
+
+Tasks_genes <- read.csv("/path/to/directory/scCellfie/scCellfie_Task_by_Gene.csv")
+Tasks_selected <- c("Arachidonate synthesis", "cis-vaccenic acid degradation", "Palmitate degradation", "Elaidate degradation", "Linoleate degradation", "Linolenate degradation", "Palmitolate degradation", "gamma-Linolenate degradation", "gamma-Linolenate synthesis", "Arachidonate degradation")
+Tasks_genes <- Tasks_genes[Tasks_genes$Task %in% Tasks_selected, ]
+library(tidyr)
+Tasks_genes <- Tasks_genes %>%
+  pivot_longer(cols = 2:ncol(Tasks_genes),
+               names_to = "column",
+               values_to = "value") %>%
+  filter(value == 1)
+genes_tasks <- unique(Tasks_genes$column) # 164 genes 
+
+library(RcisTarget)
+tmp_file <- tempfile(fileext = ".feather")
+download.file(
+  url = "https://resources.aertslab.org/cistarget/databases/mus_musculus/mm10/refseq_r80/mc9nr/gene_based/mm10__refseq-r80__500bp_up_and_100bp_down_tss.mc9nr.genes_vs_motifs.rankings.feather",
+  destfile = tmp_file,
+  mode = "wb"
+)
+motifRankings <- importRankings(tmp_file)
+genes_tasks_clean <- intersect(genes_tasks, colnames(motifRankings))
+motifEnrichment <- cisTarget(
+  geneSets = list(genes_tasks_clean = genes_tasks_clean),
+  motifRankings = motifRankings,
+   nesThreshold  = 2.5  
+)
+
+# There are no Stat6 enrichments, However Pparg and Ppara are highly enriched. There is a strong literature linking Il4 to Pparg. 
+motifEnrichmentTable <- motifEnrichment$motifEnrichmentTable
+motifEnrichmentTable[
+  grepl("STAT6", motifEnrichmentTable$TF_highConf),
+]
+# Save the results 
+write.csv(motifEnrichment, paste0(CSV, "/Motif_enrichment_upregulated_Lipid_Pathways_figure5.csv"))
+
+# Create a Heatmap of the Lipid associated Genes in the different enterocyte populations 
+
+unique(Ileum_Epithelial$InfectionStatus)
+unique(Ileum_Epithelial$FineCellType)
+unique(Ileum_Epithelial$SampleType)
+Idents(Ileum_Epithelial) <- "SampleType"
+Ileum_Epithelial_i <- subset(Ileum_Epithelial, idents = c("Ileum Lamina Propria","Ileum Intestinal Epithelial Cells" ))
+Ileum_Epithelial_i$secondlevel <- Ileum_Epithelial_i$FineCellType
+Ileum_Epithelial_i$secondlevel[Ileum_Epithelial_i$secondlevel %in% c("Middle Enterocyte","Early Enterocyte",  "Late Enterocyte" , "Saa1 inflammatory Enterocytes" ,  "Pla24gc inflammatory Enterocytes", "Stat1 inflammatory Enterocytes" )] <- "Enterocytes" 
+Ileum_Epithelial_i$Group <- paste(
+  Ileum_Epithelial_i$InfectionStatus,
+  Ileum_Epithelial_i$secondlevel,
+  sep = "_"
+)
+
+#  average expression per group
+avg_exp <- AverageExpression(
+  Ileum_Epithelial_i,
+  group.by = "Group",
+  features = genes_tasks,
+  assays = "RNA"
+)$RNA
+
+# Order columns per user-requested structure
+desired_order <- c(
+  "Naive-Enterocytes",
+  "Candida-Enterocytes",
+  "Cryptosporidium-Enterocytes",
+  "MNV-Enterocytes",
+    "Nippostrongylus-Enterocytes",
+  "SFB-YA-Enterocytes",
+  "Yersinia-Enterocytes"
+)
+desired_order <- desired_order[desired_order %in% colnames(avg_exp)]
+
+# Reorder matrix
+heat_mat <- avg_exp[, desired_order, drop = FALSE]
+#scale
+heat_mat_scaled <- t(scale(t(heat_mat)))
+heat_mat_scaled <- heat_mat_scaled[rowSums(is.na(heat_mat_scaled)) == 0, , drop = FALSE]
+
+library(ComplexHeatmap)
+library(circlize)
+library(tidyverse)
+
+heat_df <- heat_mat_scaled %>%
+  as.data.frame() %>%
+  rownames_to_column("Gene") %>%
+  pivot_longer(
+    cols = -Gene,
+    names_to = "Group",
+    values_to = "ScaledExpression"
+  )
+heat_df$Group <- factor(heat_df$Group, levels = rev(desired_order))
+heat_df$Gene  <- factor(heat_df$Gene, levels = rev(unique(heat_df$Gene)))
+midpoint <- 0
+lipid_ggheat <- ggplot(
+  heat_df,
+  aes(x = Gene, y = Group, fill = ScaledExpression)
+) +
+  geom_tile(color = NA) +
+  scale_fill_gradient2(
+    low = "#1C75BC",
+    mid = "grey",
+    high = "#F7941D",
+    midpoint = 0,
+    name = "Scaled Expression"
+  ) +
+  scale_x_discrete(expand = c(0,0)) +
+  scale_y_discrete(expand = c(0,0)) +
+  labs(title = "Lipid Metabolism-linked Gene Expression Across Enterocytes") +
+  theme_minimal(base_size = 12) +
+  theme(
+    axis.text.x = element_text(
+      angle = 90,
+      hjust = 1,
+      vjust = 0.4,
+      color = "black"
+    ),
+    axis.text.y = element_text(color = "black"),
+    axis.title = element_blank(),
+    panel.grid = element_blank(),
+    panel.border = element_rect(color = "black", fill = NA, linewidth = 0.8),
+    legend.position = "right",
+    plot.title = element_text(hjust = 0.5)
+  )
+lipid_ggheat
+
+library(svglite)
+#Figure S5
+svglite(
+  file = paste0(images, "/Lipid_genes_heatmap_Enterocytes.svg"),
+  width = 16,
+  height = 5
+)
+print(lipid_ggheat)
+dev.off()
+
+```
+
+#Gene Set enrichment for Published IL4 responses 
+```{r}
+# I took PMID: 34290141 supplemetal data. The top 200 genes enriched in IL4 treated enteroids compared to control at 24 hours based on change in logfc
+library(GSVA)
+library(GSEABase)
+library(qs2)
+library(AUCell)
+library(escape)
+library(UCell)
+
+#Load Gene set 
+genesets_Il4<- getGmt("/path/to/directoryGenesets/IL4_signature_enteroids.gmt", geneIdType=SymbolIdentifier())
+genes_il4 <- GSEABase::geneIds(genesets_Il4)
+unlist_genes_IL4 <- unlist(genes_il4)
+#Ileum_Epithelial_i[["RNA"]] <- JoinLayers(Ileum_Epithelial_i[["RNA"]])
+
+Ileum_Epithelial_i[["RNA"]] <- as(Ileum_Epithelial_i[["RNA"]], "Assay")
+print(paste0("Starting enrichment"))
+enrichment.scores <- escape.matrix(Ileum_Epithelial_i, 
+                                   gene.sets = genesets_Il4, 
+                                   groups = 9000, 
+                                   min.size = 5,
+                                   method = "UCell", 
+                                   normalize = FALSE)
+
+                                   
+
+
+# Convert rownames to a column
+enrichment.scores.out <- as.data.frame(enrichment.scores)
+enrichment.scores.out$cell_id <- rownames(enrichment.scores.out)
+
+# Move cell_id to the first column (optional)
+enrichment.scores.out <- enrichment.scores.out[, c("cell_id", setdiff(colnames(enrichment.scores.out), "cell_id"))]
+fwrite(enrichment.scores.out, paste0(CSV,"/IL4_enrichment_enterocytes_UCell.csv"))
+
+IL4 <- data.table::fread(paste0(CSV, "/IL4_enrichment_enterocytes_UCell.csv"))
+rownamesforIL4 <- IL4$cell_id
+all(rownames(IL4) %in% colnames(Ileum_Epithelial_i))
+IL4 <- IL4[,-1] # remove cell id column 
+rownames(IL4) <- rownamesforIL4
+Ileum_Epithelial_i <- AddMetaData(Ileum_Epithelial_i, metadata = IL4)
+Ileum_Epithelial_i$IL4_signature
+
+pathways_interest  <- c("IL4_signature")
+table(Ileum_Epithelial_i$InfectionStatus, Ileum_Epithelial_i$secondlevel)
+unique(Ileum_Epithelial_i$secondlevel)
+meta <- Ileum_Epithelial_i@meta.data
+meta_subset <- meta %>%
+ dplyr::select(InfectionStatus, secondlevel, FineCellType, SampleType,
+         IL4_signature = IL4_signature
+         )
+meta_subset <- meta_subset[meta_subset$secondlevel %in% c("Enterocytes"),]
+
+# Create a Violin plot showing the differences 
+meta_subset$InfectionStatus <- factor(
+  meta_subset$InfectionStatus,
+  levels = c("Naive", "Candida", "Cryptosporidium", 
+             "MNV", "Nippostrongylus", 
+             "SFB_YA", "Yersinia")
+)
+
+
+ggplot(meta_subset, 
+       aes(x = InfectionStatus, y = IL4_signature, fill = InfectionStatus)) +
+  geom_violin(trim = FALSE) +
+  geom_boxplot(width = 0.1, outlier.shape = NA, fill = "white") +
+  theme_minimal(base_size = 12) +
+  scale_fill_manual(values = c(  "#B78CBA", 
+  "#1170AA",  
+  "#FCB13F",  
+  "#60BFC1",  
+  "#EF6F6A",  
+    "#937860", 
+  "#D17A00") ) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    panel.grid.minor = element_blank()) +
+  labs(
+    title = "IL4 Signature Score in Enterocytes",
+    x = "",
+    y = "UCell Score"
+  ) +
+  guides(fill = "none")
+
+ggsave( "Enterocyte_IL4_response_enrichment_UCell_Violins.svg",  plot = last_plot() , device = NULL, 
+        path = images, width =6.5,  height = 4,  units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
+```
+
+```{r}
+# Identify whether there is an IL4 response detected in the Enterocytes of Nipostrongylus infected mice 
+genesets_Il4<- getGmt("/path/to/directoryGenesets/IL4_organoid_top100.gmt", geneIdType=SymbolIdentifier())
+genes_il4 <- GSEABase::geneIds(genesets_Il4)
+unlist_genes_IL4 <- unlist(genes_il4)
+
+
+dotplot_data <- DotPlot(Ileum_Epithelial_i, 
+                        features = unlist_genes_IL4, 
+                        group.by = "Group")
+
+desired_order <- c(
+  "Naive_Enterocytes",
+  "Candida_Enterocytes",
+  "Cryptosporidium_Enterocytes",
+  "MNV_Enterocytes",
+  "Nippostrongylus_Enterocytes",
+  "SFB_YA_Enterocytes",
+  "Yersinia_Enterocytes"
+)
+dot_df <- dotplot_data@data %>%
+  filter(id %in% desired_order) %>%
+  filter(features.plot %in% unlist_genes_IL4)
+
+# Filter for Genes > 10% in at least one condition
+dot_df_filtered <- dot_df %>%
+  group_by(features.plot) %>%
+  filter(any(pct.exp > 10)) %>%
+  ungroup()
+
+
+dot_df_filtered <- dot_df_filtered %>%
+  group_by(features.plot) %>%
+  mutate(avg.exp.scaled = as.numeric(scale(avg.exp))) %>%
+  ungroup()
+
+nippo_order_filtered <- dot_df_filtered %>%
+  filter(id == "Nippostrongylus_Enterocytes") %>%
+  arrange(pct.exp) %>% 
+  pull(features.plot)
+
+dot_df_filtered$features.plot <- factor(dot_df_filtered$features.plot, levels = nippo_order_filtered)
+dot_df_filtered$id <- factor(dot_df_filtered$id, levels = desired_order)
+
+
+il4_dotplot_filtered <- ggplot(dot_df_filtered, aes(x = features.plot, y = id)) +
+  geom_point(aes(size = pct.exp, fill = avg.exp.scaled, color = avg.exp.scaled), shape = 21) +
+  scale_fill_gradient2(
+    low = "#1C75BC", 
+    mid = "white",
+    high = "#F7941D", 
+    midpoint = 0,
+    name = "Scaled\nExpression"
+  ) +
+  scale_color_gradient2(
+    low = "#1C75BC", 
+    mid = "lightgrey", 
+    high = "#F7941D", 
+    midpoint = 0,
+    guide = "none" 
+  ) +
+  scale_size_continuous(range = c(0, 8), name = "% Expressed") + 
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5, size = 9, color = "black", face = "italic"),
+    axis.text.y = element_text(color = "black", size = 10),
+    axis.title = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.border = element_rect(color = "black", fill = NA, linewidth = 1),
+    plot.title = element_text(hjust = 0.5, face = "bold")
+  ) +
+  labs(
+    title = "IL4 Signature (Genes > 10% Detection)",
+    subtitle = "Z-score scaled across infections"
+  ) + coord_flip()
+
+il4_dotplot_filtered
+
+ggsave( "Enterocyte_IL4_response_genes_Bubble.svg",  plot = last_plot() , device = NULL, 
+        path = images, width =5,  height = 10,  units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
+
+
+```
+
+```{r}
+# Create pseudobulked information for the ileum 
+library(Seurat)
+library(tidyverse)
+library(edgeR)
+library(pheatmap)
+
+
+Ileum_filt[["RNA"]] <- as(Ileum_filt[["RNA"]], "Assay5")
+
+#remove the duodenum
+Idents(Ileum_filt) <- "SampleType"
+obj <- subset(Ileum_filt, idents = c("Ileum Lamina Propria", "Ileum Intestinal Epithelial Cells"))
+
+# Create unique ID for pseudobulking
+obj$pb_group <- paste(obj$InfectionStatus, obj$Tissue, obj$Mouse, obj$secondlevel, sep = "_")
+
+obj$pb_group <- gsub("SFB_YA", "SFB", obj$pb_group)
+
+# Filter for groups with at least 20 cells
+cell_counts <- as.data.frame(table(obj$pb_group))
+valid_groups <- cell_counts$Var1[cell_counts$Freq >= 30]
+obj <- subset(obj, subset = pb_group %in% valid_groups)
+
+# pseudobulk
+pb <- AggregateExpression(
+  object = obj,
+  assays = "RNA",
+  group.by = "pb_group",
+  layers = "counts",
+  return.seurat = FALSE
+)
+
+# normalize the raw pseudobulk data
+dge <- DGEList(counts = pb$RNA)
+dge <- calcNormFactors(dge)
+logCPM <- cpm(dge, log = TRUE, prior.count = 1)
+# Clean names: Seurat v5 replaces underscores with dashes
+colnames(logCPM) <- gsub("-", "_", colnames(logCPM))
+
+
+col_meta <- data.frame(sample = colnames(logCPM)) %>%
+  separate(sample, into = c("Infection", "Tissue", "Mouse", "CellType"), 
+           sep = "_", remove = FALSE, extra = "merge") %>%
+  mutate(Condition_Tissue_Sample = paste(Infection, Tissue, Mouse, sep = "_"))
+
+# Cell type spcific variable gene identification and correlation analysis
+actual_cts <- unique(obj$secondlevel)
+
+cor_long <- map_df(actual_cts, function(ct) {
+  
+  #Identify samples for this cell type from the logCPM matrix. Column names that end with the cell type name 
+  regex_query <- paste0("_", gsub("([+])", "\\\\+", ct), "$")
+  cols <- grep(regex_query, colnames(logCPM), value = TRUE)
+  
+  if(length(cols) < 2) {
+    message(paste("Skipping", ct, ": Not enough samples in matrix"))
+    return(NULL)
+  }
+  
+  #subset seurat for variable gene calculation
+  obj_sub <- tryCatch({
+    subset(obj, secondlevel == ct)
+  }, error = function(e) return(NULL))
+  
+  if(is.null(obj_sub) || ncol(obj_sub) == 0) return(NULL)
+  
+  obj_sub <- FindVariableFeatures(obj_sub, nfeatures = 2000, verbose = FALSE)
+
+  # Pull genes with a standardized variance > 2.0 
+  hvg_info <- HVFInfo(obj_sub)
+  ct_hvgs <- rownames(hvg_info)[hvg_info$variance.standardized > 2]
+  
+  # Correlation
+  genes <- intersect(ct_hvgs, rownames(logCPM))
+  if(length(genes) < 10) return(NULL) # Need at least some genes to correlate
+  
+  mat <- cor(as.matrix(logCPM[genes, cols]), method = "pearson")
+  
+  # convert to tidy format
+  as.data.frame(mat) %>%
+    rownames_to_column("Sample1") %>%
+    pivot_longer(-Sample1, names_to = "Sample2", values_to = "Cor") %>%
+    mutate(CellType = ct)
+})
+
+# average across cell types
+sample_map <- col_meta %>% select(sample, Condition_Tissue_Sample) %>% deframe()
+
+mean_cor_mat <- cor_long %>%
+  mutate(Group1 = sample_map[Sample1], Group2 = sample_map[Sample2]) %>%
+  group_by(Group1, Group2) %>%
+  summarise(Mean_Cor = mean(Cor, na.rm = TRUE), .groups = "drop") %>%
+  pivot_wider(names_from = Group2, values_from = Mean_Cor) %>%
+  column_to_rownames("Group1") %>% 
+  as.matrix()
+
+
+pdf("/path/to/directory/Images/GutPath_Heatmaps_corr_IEC.pdf", width = 12, height = 12)
+
+lapply(c("Epithelial"), function(tiss) {
+  m <- mean_cor_mat[grep(tiss, rownames(mean_cor_mat)), grep(tiss, colnames(mean_cor_mat))]
+  m <- m[rowSums(!is.na(m)) > 0, colSums(!is.na(m)) > 0]
+  m[is.na(m)] <- 0 
+  
+  pheatmap(m, 
+           main = paste("Correlation based on Cell-Type HVGs:", tiss),
+           clustering_distance_rows = "euclidean", 
+           clustering_distance_cols = "euclidean",
+           display_numbers = TRUE, 
+           number_format = "%.2f",
+           color = colorRampPalette(c( "white","grey", "red"))(100))
+})
+
+dev.off()
+pdf("/path/to/directory/Images/GutPath_Heatmaps_corr_LP.pdf", width = 12, height = 12)
+
+lapply(c("Propria"), function(tiss) {
+  m <- mean_cor_mat[grep(tiss, rownames(mean_cor_mat)), grep(tiss, colnames(mean_cor_mat))]
+  m <- m[rowSums(!is.na(m)) > 0, colSums(!is.na(m)) > 0]
+  m[is.na(m)] <- 0 
+  
+  pheatmap(m, 
+           main = paste("Correlation based on Cell-Type HVGs:", tiss),
+           clustering_distance_rows = "euclidean", 
+           clustering_distance_cols = "euclidean",
+           display_numbers = TRUE, 
+           number_format = "%.2f",
+           color = colorRampPalette(c( "white", "grey", "red"))(100))
+})
+
+dev.off()
+
+
+
+# Hierarchies only 
+# Lamina propria heirarchy
+tiss <- "Propria"
+m <- mean_cor_mat[grep(tiss, rownames(mean_cor_mat)), grep(tiss, colnames(mean_cor_mat))]
+m <- m[rowSums(!is.na(m)) > 0, colSums(!is.na(m)) > 0]
+m[is.na(m)] <- 0 
+
+dist_mat <- dist(m, method = "euclidean")
+hc <- hclust(dist_mat, method = "complete")
+
+
+plot(as.dendrogram(hc), 
+     main = paste("Cell-Type Hierarchy (HVGs):", tiss),
+     ylab = "Euclidean Distance",
+     nodePar = list(lab.cex = 0.3, pch = NA))
+unique(rownames(m))
+library(dendextend)
+
+#Order them
+# Create the dendrogram object
+dend <- as.dendrogram(hclust(dist(m)))
+
+unique(rownames(m))
+preferred_order <- c("Yersinia_Lamina Propria_CHMI24134", "Yersinia_Lamina Propria_CHMI24311", "Yersinia_Lamina Propria_CHMI24142", "Naive_Lamina Propria_CHMI2482", "Cryptosporidium_Lamina Propria_CHMI2493", "Cryptosporidium_Lamina Propria_CHMI2489", "Candida_Lamina Propria_CHMI24235", "Naive_Lamina Propria_CHMI24109", "MNV_Lamina Propria_CHMI24282", "MNV_Lamina Propria_CHMI24268", "Candida_Lamina Propria_CHMI24218", "SFB_Lamina Propria_CHMI25100", "SFB_Lamina Propria_CHMI25114", "Cryptosporidium_Lamina Propria_CHMI24240", "Nippostrongylus_Lamina Propria_CHMI25132", "Nippostrongylus_Lamina Propria_CHMI25134")
+
+dend_rotated <- rotate(dend, preferred_order)
+plot(dend_rotated, 
+     main = paste("Rotated Hierarchy:", tiss),
+     horiz = TRUE) 
+
+pdf("/path/to/directory/Images/GutPath_Hierarchy_Rotated_LP.pdf", width = 12, height = 8)
+par(mar = c(5, 4, 4, 15)) 
+plot(dend_rotated, 
+     main = paste("Rotated Hierarchy:", tiss),
+     horiz = TRUE,
+     nodePar = list(lab.cex = 0.7, pch = NA, lab.col = "black"))
+
+dev.off()
+
+
+# IEC Hierarchy 
+
+tiss <- "Epithelial"
+m <- mean_cor_mat[grep(tiss, rownames(mean_cor_mat)), grep(tiss, colnames(mean_cor_mat))]
+m <- m[rowSums(!is.na(m)) > 0, colSums(!is.na(m)) > 0]
+m[is.na(m)] <- 0 
+
+dist_mat <- dist(m, method = "euclidean")
+hc <- hclust(dist_mat, method = "complete")
+
+
+plot(as.dendrogram(hc), 
+     main = paste("Cell-Type Hierarchy (HVGs):", tiss),
+     ylab = "Euclidean Distance",
+     nodePar = list(lab.cex = 0.3, pch = NA))
+unique(rownames(m))
+
+#Order them
+# Create the dendrogram object
+dend <- as.dendrogram(hclust(dist(m)))
+
+unique(rownames(m))
+preferred_order <- c("Nippostrongylus_Intestinal Epithelial Cells_CHMI25134", "Nippostrongylus_Intestinal Epithelial Cells_CHMI25132", "Yersinia_Intestinal Epithelial Cells_CHMI24311", "Yersinia_Intestinal Epithelial Cells_CHMI24134", "Yersinia_Intestinal Epithelial Cells_CHMI24142", "Cryptosporidium_Intestinal Epithelial Cells_CHMI24240", "Cryptosporidium_Intestinal Epithelial Cells_CHMI2489", "Candida_Intestinal Epithelial Cells_CHMI24218", "MNV_Intestinal Epithelial Cells_CHMI24282", "MNV_Intestinal Epithelial Cells_CHMI24268", "Naive_Intestinal Epithelial Cells_CHMI24109", "Naive_Intestinal Epithelial Cells_CHMI2482", "SFB_Intestinal Epithelial Cells_CHMI25114", "SFB_Intestinal Epithelial Cells_CHMI25100") # this preserved the heirarchy and only swivels branches
+
+dend_rotated <- rotate(dend, preferred_order)
+plot(dend_rotated, 
+     main = paste("Rotated Hierarchy:", tiss),
+     horiz = TRUE) 
+
+pdf("/path/to/directory/Images/GutPath_Hierarchy_Rotated_IEC.pdf", width = 12, height = 8)
+par(mar = c(5, 4, 4, 15)) 
+plot(dend_rotated, 
+     main = paste("Rotated Hierarchy:", tiss),
+     horiz = TRUE,
+     nodePar = list(lab.cex = 0.7, pch = NA, lab.col = "black"))
+
+dev.off()
+
+```
+
+```{r}
+# Repeat the analysis for the mesenteric lymph node
+
+MLN_filt[["RNA"]] <- as(MLN_filt[["RNA"]], "Assay5")
+obj <- MLN_filt
+# Create unique ID for pseudobulking
+obj$pb_group <- paste(obj$InfectionStatus, obj$Tissue, obj$Mouse, obj$secondlevel, sep = "_")
+
+obj$pb_group <- gsub("SFB_YA", "SFB", obj$pb_group)
+
+# Filter for groups with at least 20 cells
+cell_counts <- as.data.frame(table(obj$pb_group))
+valid_groups <- cell_counts$Var1[cell_counts$Freq >= 30]
+obj <- subset(obj, subset = pb_group %in% valid_groups)
+
+# pseudobulk
+pb <- AggregateExpression(
+  object = obj,
+  assays = "RNA",
+  group.by = "pb_group",
+  layers = "counts",
+  return.seurat = FALSE
+)
+
+# normalize the raw pseudobulk data
+dge <- DGEList(counts = pb$RNA)
+dge <- calcNormFactors(dge)
+logCPM <- cpm(dge, log = TRUE, prior.count = 1)
+# Clean names: Seurat v5 replaces underscores with dashes
+colnames(logCPM) <- gsub("-", "_", colnames(logCPM))
+
+
+col_meta <- data.frame(sample = colnames(logCPM)) %>%
+  separate(sample, into = c("Infection", "Tissue", "Mouse", "CellType"), 
+           sep = "_", remove = FALSE, extra = "merge") %>%
+  mutate(Condition_Tissue_Sample = paste(Infection, Tissue, Mouse, sep = "_"))
+
+# Cell type spcific variable gene identification and correlation analysis
+actual_cts <- unique(obj$secondlevel)
+
+cor_long <- map_df(actual_cts, function(ct) {
+  
+  #Identify samples for this cell type from the logCPM matrix. Column names that end with the cell type name 
+  regex_query <- paste0("_", gsub("([+])", "\\\\+", ct), "$")
+  cols <- grep(regex_query, colnames(logCPM), value = TRUE)
+  
+  if(length(cols) < 2) {
+    message(paste("Skipping", ct, ": Not enough samples in matrix"))
+    return(NULL)
+  }
+  
+  #subset seurat for variable gene calculation
+  obj_sub <- tryCatch({
+    subset(obj, secondlevel == ct)
+  }, error = function(e) return(NULL))
+  
+  if(is.null(obj_sub) || ncol(obj_sub) == 0) return(NULL)
+  
+  obj_sub <- FindVariableFeatures(obj_sub, nfeatures = 2000, verbose = FALSE)
+
+  # Pull genes with a standardized variance > 2.0 
+  hvg_info <- HVFInfo(obj_sub)
+  ct_hvgs <- rownames(hvg_info)[hvg_info$variance.standardized > 2]
+  
+  # Correlation
+  genes <- intersect(ct_hvgs, rownames(logCPM))
+  if(length(genes) < 10) return(NULL) # Need at least some genes to correlate
+  
+  mat <- cor(as.matrix(logCPM[genes, cols]), method = "pearson")
+  
+  # convert to tidy format
+  as.data.frame(mat) %>%
+    rownames_to_column("Sample1") %>%
+    pivot_longer(-Sample1, names_to = "Sample2", values_to = "Cor") %>%
+    mutate(CellType = ct)
+})
+
+# average across cell types
+sample_map <- col_meta %>% select(sample, Condition_Tissue_Sample) %>% deframe()
+
+mean_cor_mat <- cor_long %>%
+  mutate(Group1 = sample_map[Sample1], Group2 = sample_map[Sample2]) %>%
+  group_by(Group1, Group2) %>%
+  summarise(Mean_Cor = mean(Cor, na.rm = TRUE), .groups = "drop") %>%
+  pivot_wider(names_from = Group2, values_from = Mean_Cor) %>%
+  column_to_rownames("Group1") %>% 
+  as.matrix()
+
+
+pdf("/path/to/directory/Images/GutPath_Heatmaps_corr_MLN.pdf", width = 12, height = 12)
+
+lapply(c("Mesenteric"), function(tiss) {
+  m <- mean_cor_mat[grep(tiss, rownames(mean_cor_mat)), grep(tiss, colnames(mean_cor_mat))]
+  m <- m[rowSums(!is.na(m)) > 0, colSums(!is.na(m)) > 0]
+  m[is.na(m)] <- 0 
+  
+  pheatmap(m, 
+           main = paste("Correlation based on Cell-Type HVGs:", tiss),
+           clustering_distance_rows = "euclidean", 
+           clustering_distance_cols = "euclidean",
+           display_numbers = TRUE, 
+           number_format = "%.2f",
+           color = colorRampPalette(c( "white", "grey", "red"))(100))
+})
+
+dev.off()
+
+
+
+# Hierarchies only 
+# MLN heirarchy
+tiss <- "Mesenteric"
+m <- mean_cor_mat[grep(tiss, rownames(mean_cor_mat)), grep(tiss, colnames(mean_cor_mat))]
+m <- m[rowSums(!is.na(m)) > 0, colSums(!is.na(m)) > 0]
+m[is.na(m)] <- 0 
+
+dist_mat <- dist(m, method = "euclidean")
+hc <- hclust(dist_mat, method = "complete")
+
+
+plot(as.dendrogram(hc), 
+     main = paste("Cell-Type Hierarchy (HVGs):", tiss),
+     ylab = "Euclidean Distance",
+     nodePar = list(lab.cex = 0.3, pch = NA))
+unique(rownames(m))
+
+#Order them
+# Create the dendrogram object
+dend <- as.dendrogram(hclust(dist(m)))
+
+unique(rownames(m))
+preferred_order <- c("Yersinia_Mesenteric Lymph Node_CHMI24142", "Yersinia_Mesenteric Lymph Node_CHMI24134", "Yersinia_Mesenteric Lymph Node_CHMI24311", "SFB_Mesenteric Lymph Node_CHMI25114", "SFB_Mesenteric Lymph Node_CHMI25100", "Cryptosporidium_Mesenteric Lymph Node_CHMI24240", "Cryptosporidium_Mesenteric Lymph Node_CHMI2489", "Cryptosporidium_Mesenteric Lymph Node_CHMI2493", "Candida_Mesenteric Lymph Node_CHMI24235", "Candida_Mesenteric Lymph Node_CHMI24218", "Naive_Mesenteric Lymph Node_CHMI24109", "Naive_Mesenteric Lymph Node_CHMI2482", "Nippostrongylus_Mesenteric Lymph Node_CHMI25134", "Nippostrongylus_Mesenteric Lymph Node_CHMI25132", "MNV_Mesenteric Lymph Node_CHMI24282", "MNV_Mesenteric Lymph Node_CHMI24268")
+
+dend_rotated <- rotate(dend, preferred_order)
+plot(dend_rotated, 
+     main = paste("Rotated Hierarchy:", tiss),
+     horiz = TRUE) 
+
+pdf("/path/to/directory/Images/GutPath_Hierarchy_Rotated_MLN.pdf", width = 12, height = 8)
+par(mar = c(5, 4, 4, 15)) 
+plot(dend_rotated, 
+     main = paste("Rotated Hierarchy:", tiss),
+     horiz = TRUE,
+     nodePar = list(lab.cex = 0.7, pch = NA, lab.col = "black"))
+
+dev.off()
+
+
+
+```
+
+
+```{R}
+
+# Examine a specific subset of the cells 
+anno_data <- data.frame(Sample = rownames(mean_cor_mat)) %>%
+  separate(Sample, into = c("Infection", "Tissue", "Mouse"), sep = "_", remove = FALSE) %>%
+  column_to_rownames("Sample") %>%
+  select(Infection) 
+
+target_ct <- "Monocytes" 
+unique(obj$secondlevel)
+
+
+ent_cor_mat <- cor_long %>%
+  filter(CellType == target_ct ) %>%
+  select(Sample1, Sample2, Cor) %>%
+  pivot_wider(names_from = Sample2, values_from = Cor) %>%
+  column_to_rownames("Sample1") %>%
+  as.matrix()
+
+
+# pull the metadata for these specific samples
+ent_anno <- data.frame(Sample = rownames(ent_cor_mat)) %>%
+  separate(Sample, into = c("Infection", "Tissue", "Mouse", "CellType"), 
+           sep = "_", remove = FALSE) %>%
+  column_to_rownames("Sample") %>%
+  select(Infection)
+
+# Sort by InfectionStatus 
+ent_order <- order(ent_anno$Infection)
+ent_cor_mat_ordered <- ent_cor_mat[ent_order, ent_order]
+ent_anno_ordered <- ent_anno[ent_order, , drop = FALSE]
+
+
+pheatmap::pheatmap(
+  ent_cor_mat_ordered,
+  main = paste("Correlation Matrix: ", target_ct),
+  cluster_rows = FALSE, 
+  cluster_cols = FALSE,
+  annotation_col = ent_anno_ordered,
+  annotation_row = ent_anno_ordered,
+  display_numbers = TRUE,
+  number_format = "%.2f",
+  color = colorRampPalette(c("white", "red"))(100),
+  breaks = seq(min(ent_cor_mat, na.rm = TRUE), 1, length.out = 101) 
+)
+
+pdf("/path/to/directory/Images/GutPath_Heatmaps_corr_Monocytes.pdf", width = 12, height = 12)
+
+pheatmap::pheatmap(
+  ent_cor_mat_ordered,
+  main = paste("Correlation Matrix: ", target_ct),
+  cluster_rows = TRUE, 
+  cluster_cols = TRUE,
+  display_numbers = TRUE,
+  number_format = "%.2f",
+  color = colorRampPalette(c("white", "red"))(100),
+  breaks = seq(min(ent_cor_mat, na.rm = TRUE), 1, length.out = 101) 
+)
+
+dev.off()
+
+
+```
+
+
+
+
+
 
 #Export Data for CellxGene
 ```{r}
@@ -2511,23 +3712,65 @@ ncol(Ileum_filt_temp2)
 table(Ileum_filt_temp2$Infection, Ileum_filt_temp2$`Level 4 Annotation`)
 
 DimPlot(Ileum_filt_temp2, reduction = "wnn.umap_cc", raster = T, group.by = "Level 1 Annotation")
+
+# Append ADT to RNA
+# RNA
+rna_counts <- GetAssayData(Ileum_filt_temp2, assay = "RNA", slot = "counts")
+rna_data   <- GetAssayData(Ileum_filt_temp2, assay = "RNA", slot = "data")
+rna_scale  <- GetAssayData(Ileum_filt_temp2, assay = "RNA", slot = "scale.data")
+
+# ADT
+Ileum_filt_temp2[["ADT"]] <- JoinLayers(Ileum_filt_temp2[["ADT"]])
+adt_counts <- GetAssayData(Ileum_filt_temp2, assay = "ADT", slot = "counts")
+adt_data   <- GetAssayData(Ileum_filt_temp2, assay = "ADT", slot = "data")
+adt_scale  <- GetAssayData(Ileum_filt_temp2, assay = "ADT", slot = "scale.data")
+adt_counts <- adt_counts[, colnames(rna_counts)]
+adt_data   <- adt_data[, colnames(rna_data)]
+adt_scale  <- adt_scale[, colnames(rna_scale)]
+rownames(adt_counts) <- paste0("Protein-", rownames(adt_counts))
+rownames(adt_data)   <- paste0("Protein-", rownames(adt_data))
+rownames(adt_scale)  <- paste0("Protein-", rownames(adt_scale))
+combined_counts <- rbind(rna_counts, adt_counts)
+combined_data   <- rbind(rna_data, adt_data)
+combined_scale  <- rbind(rna_scale, adt_scale)
+
+identical(rownames(combined_counts), rownames(combined_data))
+
+
+combined_assay <- CreateAssayObject(
+  counts = combined_counts
+)
+identical(rownames(combined_assay), rownames(combined_data))
+
+
+
+
+combined_assay@data <- combined_data
+combined_assay@scale.data <- combined_scale
+#LayerData(combined_assay, layer = "data") <- combined_data
+#LayerData(combined_assay, layer = "scale.data") <- combined_scale
+
+# Assign it
+DefaultAssay(Ileum_filt_temp2) <-"ADT"
+Ileum_filt_temp2[["RNA"]] <- NULL
+Ileum_filt_temp2[["RNA"]] <- combined_assay
+
+DefaultAssay(Ileum_filt_temp2) <-"RNA"
 Ileum_filt_temp2@assays$ADT <- NULL
-Ileum_filt_temp2[["RNA"]] <- JoinLayers(Ileum_filt_temp2[["RNA"]])
-Ileum_filt_temp2[["RNA"]] <- as(Ileum_filt_temp2[["RNA"]] , "Assay")
-DefaultAssay(Ileum_filt_temp2) <- "RNA"
-sceasy::convertFormat(Ileum_filt_temp2, from = "seurat", to = "anndata", main_layer = "data",  outFile = "/path/to/analysis/directory/Seurat_Files/CEllxGene_Ileum_Jul2025.h5ad")
+#Ileum_filt_temp2[["RNA"]] <- JoinLayers(Ileum_filt_temp2[["RNA"]])
+#Ileum_filt_temp2[["RNA"]] <- as(Ileum_filt_temp2[["RNA"]] , "Assay")
+library(reticulate)
+use_python("/home/hartandrew/.conda/envs/sccellfie_env/bin/python", required = TRUE)
+library(sceasy)
+sceasy::convertFormat(Ileum_filt_temp2, from = "seurat", to = "anndata", main_layer = "data",  outFile = "/path/to/directory/Seurat_Files/CEllxGene_Ileum_Feb2026.h5ad")
 
-Ileum_filt_temp2@assays$RNA@scale.data <- matrix(numeric(0), nrow = 0, ncol = 0)
-SaveH5Seurat(Ileum_filt_temp2, filename = "/path/to/analysis/directory/Seurat_Files/Ileum_filt_CellxGene_jul_2025.h5Seurat", overwrite = T)
-Convert("/path/to/analysis/directory/Seurat_Files/Ileum_filt_CellxGene_jul_2025.h5Seurat",   assay = "RNA", dest = "h5ad", overwrite = TRUE)
-
-qs2::qs_save(Ileum_filt_temp2, "/path/to/analysis/directory/Seurat_Files/Ileum_filt_CellxGene_jul_2025.qs2" )
+qs2::qs_save(Ileum_filt_temp2, "/path/to/analysis/directory/Seurat_Files/Ileum_filt_CellxGene_feb_2026.qs2" )
 
 ```
 
 
 ```{r}
-
+MLN <- qs_read("/path/to/directory/Seurat_Files/Analysis2_MLN_clustered_annotated.qs2")
 MLN_temp <- MLN
 
 #Empty Metadata
@@ -2579,11 +3822,46 @@ ncol(MLN_temp2)
 table(MLN_temp2$Infection, MLN_temp2$`Level 3 Annotation`)
 
 DimPlot(MLN_temp2, reduction = "wnn.umap_cc", raster = T, group.by = "Level 1 Annotation")
+
+# Append ADT to RNA
+# RNA
+rna_counts <- GetAssayData(MLN_temp2, assay = "RNA", slot = "counts")
+rna_data   <- GetAssayData(MLN_temp2, assay = "RNA", slot = "data")
+rna_scale  <- GetAssayData(MLN_temp2, assay = "RNA", slot = "scale.data")
+
+# ADT
+MLN_temp2[["ADT"]] <- JoinLayers(MLN_temp2[["ADT"]])
+adt_counts <- GetAssayData(MLN_temp2, assay = "ADT", slot = "counts")
+adt_data   <- GetAssayData(MLN_temp2, assay = "ADT", slot = "data")
+adt_scale  <- GetAssayData(MLN_temp2, assay = "ADT", slot = "scale.data")
+adt_counts <- adt_counts[, colnames(rna_counts)]
+adt_data   <- adt_data[, colnames(rna_data)]
+adt_scale  <- adt_scale[, colnames(rna_scale)]
+rownames(adt_counts) <- paste0("Protein-", rownames(adt_counts))
+rownames(adt_data)   <- paste0("Protein-", rownames(adt_data))
+rownames(adt_scale)  <- paste0("Protein-", rownames(adt_scale))
+combined_counts <- rbind(rna_counts, adt_counts)
+combined_data   <- rbind(rna_data, adt_data)
+combined_scale  <- rbind(rna_scale, adt_scale)
+
+identical(rownames(combined_counts), rownames(combined_data))
+
+combined_assay <- CreateAssayObject(
+  counts = combined_counts
+)
+identical(rownames(combined_counts), rownames(combined_data))
+combined_assay@data <- combined_data
+combined_assay@scale.data <- combined_scale
+
+# Assign it
+DefaultAssay(MLN_temp2) <- "ADT"
+MLN_temp2[["RNA"]] <- NULL
+MLN_temp2[["RNA"]] <- combined_assay
 MLN_temp2@assays$ADT <- NULL
-MLN_temp2[["RNA"]] <- JoinLayers(MLN_temp2[["RNA"]])
-MLN_temp2[["RNA"]] <- as(MLN_temp2[["RNA"]] , "Assay")
 DefaultAssay(MLN_temp2) <- "RNA"
-sceasy::convertFormat(MLN_temp2, from = "seurat", to = "anndata", main_layer = "data",  outFile = "/path/to/analysis/directory/Seurat_Files/CEllxGene_MLN_Jul2025.h5ad")
+#MLN_temp2[["RNA"]] <- JoinLayers(MLN_temp2[["RNA"]])
+#MLN_temp2[["RNA"]] <- as(MLN_temp2[["RNA"]] , "Assay")
+sceasy::convertFormat(MLN_temp2, from = "seurat", to = "anndata", main_layer = "data",  outFile = "/path/to/directory/Seurat_Files/CEllxGene_MLN_feb2026.h5ad")
 ```
 
 

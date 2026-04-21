@@ -993,11 +993,11 @@ pathways_interest  <- c("HALLMARK_INTERFERON_ALPHA_RESPONSE","HALLMARK_BILE_ACID
         "IL27_Upregulated_mouse"
         )
 
-table(Ileum_filt$InfectionStatus, Ileum_filt$secondlevel)
+table(Ileum_filt$InfectionStatus,Ileum_filt$Mouse, Ileum_filt$secondlevel)
 unique(Ileum_filt$secondlevel)
 meta <- Ileum_filt@meta.data
 meta_subset <- meta %>%
- dplyr::select(InfectionStatus, secondlevel, FineCellType, SampleType,
+ dplyr::select(InfectionStatus, Mouse, secondlevel, FineCellType, SampleType,
          HALLMARK_INTERFERON_ALPHA_RESPONSE = HALLMARK_INTERFERON_ALPHA_RESPONSE, 
          HALLMARK_BILE_ACID_METABOLISM = HALLMARK_BILE_ACID_METABOLISM, 
          HALLMARK_GLYCOLYSIS =HALLMARK_GLYCOLYSIS, 
@@ -1199,6 +1199,63 @@ ggsave("HHALLMARK_HYPOXIA_Ucell_Heatmap_AllSamples.svg", plot = last_plot() ,dev
 
 
 
+```{r}
+# Replot the heatmaps according to mouse replicate 
+meta_subset <- meta_subset %>%
+  mutate(across(all_of(pathways_interest), as.numeric))
+
+meta_subset$sample <- paste0(meta_subset$InfectionStatus, "_", meta_subset$Mouse)
+heat <- list()
+for (i in pathways_interest) {
+  
+  avg_scores <- meta_subset %>%
+  group_by(sample, secondlevel) %>%
+  summarise(mean_score = mean(!!sym(i), na.rm = TRUE), .groups = "drop")
+  
+  
+  # Scale mean_score *within* each cell type (secondlevel) across InfectionStatus
+avg_scores_scaled <- avg_scores %>%
+  group_by(secondlevel) %>%                      # scale within cell type
+  mutate(scaled_score = as.numeric(scale(mean_score))) %>%
+  ungroup()
+avg_scores_scaled$secondlevel <- factor(avg_scores_scaled$secondlevel, levels = cellorder)
+#avg_scores_scaled$InfectionStatus <- factor(avg_scores_scaled$InfectionStatus, levels = infectionorder)
+
+low <-min(avg_scores_scaled$mean_score)
+max <-max(avg_scores_scaled$mean_score)
+midpoint <-(low + max) /2
+
+#avg_scores$InfectionStatus <- factor(avg_scores_scaled$InfectionStatus, levels = infectionorder)
+heat[[i]] <- ggplot(avg_scores_scaled, aes(x = secondlevel, y = sample, fill = scaled_score)) +
+  geom_tile(color =NA) +
+  scale_fill_gradient2(
+    low = "#1C75BC", mid = "grey", high = "#F7941D",
+    midpoint = midpoint,
+    name = "Scaled UCell Score"
+  ) +
+  scale_x_discrete(expand = c(0,0)) +
+  scale_y_discrete(expand = c(0,0)) +
+  labs(title = paste0(i)) +
+  theme_minimal(base_size = 12) +
+  theme(
+    axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.4, color = "black"),
+    axis.text = element_text(color = "black"),
+    axis.title = element_blank(),
+    panel.grid = element_blank(),
+    panel.border = element_rect(color = "black", fill = NA, linewidth = 0.8),
+    legend.position = "right"
+  )
+}
+
+heat[["HALLMARK_INTERFERON_GAMMA_RESPONSE"]] + theme( title = element_blank())
+ggsave("Hallmark_IFNG_Ucell_Heatmap_AllSamples_MouseReps.svg", plot = last_plot() ,device = NULL,
+  path = images, scale = 1, width = 11, height = 5, limitsize = TRUE, bg = NULL)
+heat[["HALLMARK_TGF_BETA_SIGNALING"]] + theme( title = element_blank())
+ggsave("Hallmark_TGFb_Ucell_Heatmap_AllSamples_MouseReps.svg", plot = last_plot() ,device = NULL,
+  path = images, scale = 1, width = 11, height = 5, limitsize = TRUE, bg = NULL)
+
+```
+
 # ssGSEA Ucell ENrichments of the MLN ----
 ```{r}
 
@@ -1397,7 +1454,7 @@ Correctcolors <- c(  "#B78CBA",   "#1170AA",
   "#60BFC1",  
   "#EF6F6A",  
     "#937860", 
-  "#D17A00",   )
+  "#D17A00"  )
 meta <- Ileum_filt_i@meta.data %>%
   dplyr::select(Mouse, InfectionStatus, secondlevel)
 
@@ -1457,6 +1514,56 @@ plots[[4]] + theme(axis.title.x = element_blank(),
                    plot.title = element_blank(),
                    axis.text = element_text(color = "black"))
 ggsave("Tuftcells_frequency_Ileum_By_Infection.svg", plot = last_plot(), path = images, width = 6, height = 4)
+
+                   
+
+# graph by Mouse sample to show that replicates are consistent
+
+meta <- Ileum_filt@meta.data %>%
+  dplyr::select(Mouse, InfectionStatus, secondlevel, SampleType)
+unique(meta$SampleType)
+meta <- meta[meta$SampleType %in% c("Ileum Lamina Propria","Ileum Intestinal Epithelial Cells" ),]
+meta$sample <- paste0(meta$InfectionStatus, "_", meta$Mouse)
+freq_data <- meta %>%
+  group_by(sample, secondlevel) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  group_by(sample) %>%
+  mutate(freq = n / sum(n)) %>%
+  ungroup()
+
+
+freq_data$InfectionStatus <- sub("_.*", "", freq_data$sample)
+cell_types <- c("Monocytes", "Goblet Cells", "Neutrophils", "Tuft Cells")
+
+plots <- lapply(cell_types, function(ct) {
+  ggplot(filter(freq_data, secondlevel == ct),
+         aes(x = sample, y = freq, fill = InfectionStatus)) +
+    geom_bar(stat = "identity", position = "dodge") +
+    labs(
+      title = ct,
+      y = "Fraction of cells",
+      x = "Infection"
+    ) +
+    scale_y_continuous(expand = expansion(mult = c(0, 0.05))) +
+    scale_fill_manual(values = Correctcolors) +
+    theme_classic(base_size = 12) +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      
+    )
+})
+
+
+plots[[3]] + theme(axis.title.x = element_blank(), 
+                   plot.title = element_blank(),
+                   axis.text = element_text(color = "black"))
+ggsave("Neutrophils_frequency_Ileum_By_Infection_MouseReps.svg", plot = last_plot(), path = images, width = 6, height = 4)
+
+plots[[4]] + theme(axis.title.x = element_blank(), 
+                   plot.title = element_blank(),
+                   axis.text = element_text(color = "black"))
+ggsave("TuftCells_frequency_Ileum_By_Infection_MouseReps.svg", plot = last_plot(), path = images, width = 6, height = 4)
+
 
                    
                    

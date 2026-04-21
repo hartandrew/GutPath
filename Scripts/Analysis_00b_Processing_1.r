@@ -100,15 +100,17 @@ Sample_directory$MtCutoff <- ifelse(
 
 
 # Create a function that will load the data, filter, and prep for QC evaluation
+# This function is specifically designed for a variety of inputs fitting MIST experiments including the infection, the mouse name, folder name of the Cellranger output, etc. The output will produce a seurat object for each sample
 process_sample_mist_meta <- function(sample_id,        # Name of the variable 
-                                     folder_id,        # Name of the folder 
-                                     mouse_id,         
-                                     tissue_type,      
-                                     infection_status, 
-                                     mt_cutoff,        # 0.05 or 0.20
+                                     folder_id, # Folder containing the Cellranger output       # Name of the folder 
+                                     mouse_id,  # unique Mouse identifier        
+                                     tissue_type, #   Tissue from which cells were taken  
+                                     infection_status,  # Name of specific infection (eg "Cryptosporidium" or  "Naive")
+                                     mt_cutoff,        # 0.05 or 0.20 for this project
                                      project_dir , 
-                                     isotype_controls,
-                                     image_output_dir = NULL) {
+                                     isotype_controls, # The specific names given to the CITEseq ADT probes that are isotype controls
+                                     image_output_dir = NULL) # A path to where images should be saved
+                                      {
   
   message(paste("Processing:", sample_id, "| Mouse:", mouse_id, "| Tissue:", tissue_type))
   

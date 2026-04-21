@@ -32,8 +32,6 @@ options(future.globals.maxSize = 5000 * 1024^2)
 
 
 #directory set up----
-
-getwd() #/home/hartandrew
 setwd("/path/to/analysis/directory")
 out <- "/path/to/analysis/directory/Output"
 version <- "/path/to/analysis/directory/Version"

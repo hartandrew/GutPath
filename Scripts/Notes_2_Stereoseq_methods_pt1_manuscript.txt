@@ -1,0 +1,104 @@
+
+# Description: Here is an account of the processes used to create and run the SAW pipeline and subsequently convert output to Seurat compatible format for analysis 
+
+# Mus_musculus.GRCm39.115 reference was used 
+# An additional rRNA fast was included under the gene \'93BK000964\'94 which greatly improved ribosomal identification wget https://www.ncbi.nlm.nih.gov/nuccore/BK000964.3?report=fasta -O mouse_rRNA.fa
+
+
+# Making the SAW reference  
+cd /path/to/directory/SAW_pipeline/references/
+rm -rf ./GRCm39_SuperIndex_Final
+
+nohup saw makeRef \
+  --mode=STAR \
+  --fasta=./GRCm39_115_raw/GRCm39_SuperRef.fa \
+  --gtf=./GRCm39_115_raw/GRCm39_Super_Fixed.gtf \
+  --rRNA-fasta=./GRCm39_115_raw/mouse_rRNA_all.fa \
+  --genome=./GRCm39_SuperIndex_Final \
+  > ./makeRef_Final.log 2>&1 &
+
+#Making the Bowtie2 Reference
+cd /path/to/directory/SAW_pipeline/references
+saw makeRef \
+    --mode=Bowtie2 \
+    --fasta=/path/to/directory/SAW_pipeline/references/GRCm39_115_raw/GRCm39_SuperRef.fa \
+    --basename=GRCm39_mouse \
+    --genome=./Bowtie2_GRCm39_custom_reference
+
+
+# Making Kraken Database
+# First the Kraken 2 database must be downloaded
+# I will use the Kraken2 PlusPF database (last updated october 2025)
+cd /path/to/directory/SAW_pipeline/references
+curl -o k2_pluspf_20251015.tar.gz https://genome-idx.s3.amazonaws.com/kraken/k2_pluspf_20251015.tar.gz
+tar -xzf ./k2_pluspf_20251015/k2_pluspf_20251015.tar.gz 
+cd /path/to/directory/SAW_pipeline/references/k2_pluspf_20251015
+mkdir ./taxonomy
+wget https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz
+tar -xzf taxdump.tar.gz -C ./taxonomy
+# Holding off on the step below. My current database looks like the directory they provide and may already be in the correct format without needing to generate a de novo database
+saw makeRef \
+    --mode=Kraken2 \
+    --database=/path/to/directory/SAW_pipeline/references/k2_pluspf_20251015
+
+# Example Command Used to run SAW pipeline
+mkdir /path/to/directory/SAW_pipeline/runs/Yp_SI_2025_custom
+cd /path/to/directory/SAW_pipeline/runs/Yp_SI_2025_custom
+nohup saw count \
+    --id=Yp_SI_2025_custom \
+    --sn=Y01679L2 \
+    --omics=transcriptomics \
+    --kit-version="Stereo-seq N FFPE V1.0" \
+    --sequencing-type="PE75_25+59" \
+    --chip-mask=/path/to/directory/STOmics_stereo-seq_OMNI/Y01679L2/00.Rawdata/mask/Y01679L2.barcodeToPos.h5 \
+    --organism=mouse \
+    --tissue=small_intestine \
+    --fastqs=/path/to/directory/STOmics_stereo-seq_OMNI/Y01679L2/00.Rawdata/reads \
+    --microorganism-detect \
+    --ref-libraries=/path/to/directory/SAW_pipeline/references/GRCm39_references_custom.csv \
+    --threads-num 32 \
+    --image-tar=/path/to/directory/STOmics_stereo-seq_OMNI/Y01679L2/00.Rawdata/image/Y01679L2_SC_20251111_115423_4.1.0.tar.gz \
+    > Yp1_STomics_SI_custom.saw_count.log 2>&1 &
+
+
+
+# Third party users have been instrumental in downstream analyses of Stereoseq data. In particular, I will use the process below to convert the data into an R/seurat compatible format
+https://github.com/limin321/addImg2annData
+
+docker pull limin321/addimg2anndata:0.0.1
+
+#Required inputs:
+
+#regist.tif. This file is the output of SAW pipeline, normally located in the 03.register/ssDNA_SS200000135TL_D1_regist.tif for Saw7; and outs/image/SS200000135TL_D1_ssDNA_regist.tif for Saw8.
+
+#gem.gz file. For example, xxx.tissue.gem.gz file. The gem file can be converted from gef file. Please refer SAW pipeline on how to generate gem file if not provided in the SAW outputs.
+
+#bin_size. Default is bin=200. This is from previous step, but won't really affect this tool running.
+#hires. Default is 4, which means scaling the original tif image to 4%.
+#lowres. Default is 1, which means scaling the original tif image to 1%.
+#library_id. Default is "S123". Set your read library ID value.
+
+# Gef to Gem format conversion and them utilization of public resources to create Seurat compatible data
+# Yersinia Sample 
+
+cd /path/to/directory//SAW_pipeline/runs/Yp_SI_2025_custom/
+mkdir ./format_conversion
+# Copy the files needed 
+cp ./Yp_SI_2025_custom/outs/feature_expression/Y01679L2.adjusted.cellbin.gef /path/to/directory//SAW_pipeline/runs/Yp_SI_2025_custom/format_conversion
+cp ./Yp_SI_2025_custom/outs/image/Y01679L2_ssDNA_regist.tif /path/to/directory//SAW_pipeline/runs/Yp_SI_2025_custom/format_conversion
+
+# Convert the gef to a gem file using SAW tools 
+cd /path/to/directory//SAW_pipeline/saw-8.2.2
+export SAW_HOME=/path/to/directory//SAW_pipeline/saw-8.2.2
+export PATH=$SAW_HOME/bin:$PATH
+cd /path/to/directory//SAW_pipeline/runs/Yp_SI_2025_custom/Yp_SI_2025_custom/outs
+saw convert gef2gem \
+    --cellbin-gef=/path/to/directory//SAW_pipeline/runs/Yp_SI_2025_custom/format_conversion/Y01679L2.adjusted.cellbin.gef \
+    --gef=/path/to/directory//SAW_pipeline/runs/Yp_SI_2025_custom/Yp_SI_2025_custom/outs/feature_expression/Y01679L2.raw.gef \
+    --cellbin-gem=/path/to/directory//SAW_pipeline/runs/Yp_SI_2025_custom/format_conversion/Y01679L2.adjusted.cellbin.gem.gz
+
+
+# I can then convert the cell bin data with the following command 
+cd /path/to/directory//SAW_pipeline/runs/Yp_SI_2025_custom/format_conversion
+
+docker run --rm -v /path/to/directory//SAW_pipeline/runs/Yp_SI_2025_custom/format_conversion:/home/test limin321/addimg2anndata:0.0.1 bash addImage.sh -t /home/test/Y01679L2_ssDNA_regist.tif -i /home/test/Y01679L2.adjusted.cellbin.gem.gz -b 1 -c TRUE

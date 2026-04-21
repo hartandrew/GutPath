@@ -9,7 +9,7 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 # Description. Using the annotated data for the MLn and Ileu. This script will explore that data and create major visualization. 
-# Figure Panels made: Figure 2A, Figure 2B, Figure S2A, Figure S2B, Figure 2D, Figure S2G, Figure 2C, Figure S2F, Figure S2D, Figure S2E, Figure S2C, Figure S1D, Figure S3A, Figure 2E, Figure 3A, Figure 3B
+# Figure Panels made: Figure 2A, Figure 2B, Figure S2A, Figure S2B, Figure 2D, Figure S2G, Figure 2C, Figure S2F, Figure S2D, Figure S2E, Figure S2C, Figure S1D, Figure S3A, Figure 2E, Figure 3A, Figure 3B, Figure S3B
 #Load Libraries 
 ```{r}
 library(Seurat)
@@ -746,6 +746,118 @@ dotplot_IEL + dotplot_LP + plot_layout(guides = "collect")
 ggsave( "Ileum_bubbleplots_totalCondition_proportions_Fig2_Oct2025.svg",  plot = last_plot() , device = NULL,  path = images,  scale = 1,  width = 11,  height = 10,  units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
 
 ```
+
+
+# Here I make an barchart displaying the "infection-specific" cell states in the ileum
+
+```{r}
+Ileum_filt2 <- qs_read("/path/to/directory/Seurat_Files/Analysis2.5_Ileum.qs2")
+unique(Ileum_filt2$SampleType)
+unique(Ileum_filt2$FinestCellType)
+all_conditions <- c("Naive", "Candida", "Cryptosporidium", "MNV",
+                    "Nippostrongylus", "SFB_YA", "Yersinia")
+library(tidyr)
+# Which cell types would not be identified in the Naive state
+data_all <- Ileum_filt2@meta.data %>%
+  group_by(FinestCellType, InfectionStatus) %>%
+  summarise(count = n(), .groups = "drop") %>%
+  complete(
+           FinestCellType = FinestCellType,
+           InfectionStatus = all_conditions,
+           fill = list(count = 0))
+#  Total cells across both tissues
+total_per_condition <- data_all %>%
+  group_by(InfectionStatus) %>%
+  summarise(global_total = sum(count), .groups = "drop")
+
+data_all <- data_all %>%
+  left_join(total_per_condition, by = "InfectionStatus") %>%
+  mutate(frequency = count / global_total)
+
+
+rare_celltypes <- data_all %>%
+  filter(InfectionStatus == "Naive", count < 10) %>%
+  arrange(frequency) %>%
+  select( FinestCellType, frequency)
+
+rare_celltypes
+
+
+data_Select <- data_all[data_all$FinestCellType %in% rare_celltypes$FinestCellType,]
+
+data_Select <- data_Select %>%
+  mutate(
+    InfectionStatus = factor(
+      InfectionStatus,
+      levels = c("Naive", "Candida", "Cryptosporidium", "MNV",
+                 "Nippostrongylus", "SFB_YA", "Yersinia")
+    ),
+    FinestCellType = factor(FinestCellType, levels = rev(unique(FinestCellType)))
+  )
+
+# Stacked bar plot
+ggplot(data_Select, aes(x = FinestCellType, y = count, fill = InfectionStatus)) +
+  geom_bar(stat = "identity", position = "stack", color = "black", linewidth = 0.2) +
+  scale_fill_manual(
+    values = c(
+      "Naive" = "#999999",
+      "Candida" = "#E69F00",
+      "Cryptosporidium" = "#56B4E9",
+      "MNV" = "#009E73",
+      "Nippostrongylus" = "#F0E442",
+      "SFB_YA" = "#0072B2",
+      "Yersinia" = "#D55E00"
+    )
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor = element_blank()
+  ) +
+  labs(
+    x = "Finest Cell Type",
+    y = "Cell Count",
+    fill = "Infection Status",
+    title = "Counts per Condition for Rare (<10 Naive) Cell Types"
+  )
+
+
+data_Select <- data_Select %>%
+  group_by(FinestCellType) %>%
+  mutate(total_count = sum(count)) %>%
+  ungroup() %>%
+  # reorder factor by descending total count
+  mutate(FinestCellType = forcats::fct_reorder(FinestCellType, total_count, .desc = TRUE))
+
+p <- ggplot(data_Select, aes(x = FinestCellType, y = count, fill = InfectionStatus)) +
+  geom_bar(stat = "identity", position = "stack", color = "black", linewidth = 0.2) +
+  scale_fill_manual(values = infectioncolors) +
+  theme_minimal(base_size = 12) +
+  theme(
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor = element_blank(), 
+    axis.text = element_text(color = "black")
+  ) +
+  labs(
+    y = "Cell Count",
+    fill = "Infection Status"
+  )
+
+#Figure S3B
+p + scale_y_break(c(4000, 8500))
+ggsave( "Infection_induced_CellTypes_CountBarplot_fig2.svg",  plot = last_plot() , device = NULL,  path = images,  scale = 1,  width = 9,  height = 5,  units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
+```
+
+
+
+
+
+
+
 
 
 ```{r}
@@ -3015,7 +3127,7 @@ plots <- lapply(seq_along(infections), function(i) {
   res$FDR_signFC <- ifelse(res$logFC < 0, -(1 - res$SpatialFDR), 1 - res$SpatialFDR)
   res$FDR_FC     <- 1 - res$SpatialFDR
   
-  # Filter to Monocytes / Neutrophils or other selected cells
+  # Filter to Monocytes and Neutrophils or other selected cells
   res <- res[res$secondlevel %in% cell_subset, ]
   if (nrow(res) == 0) return(NULL)
 

@@ -206,7 +206,7 @@ DimPlot(MLN, reduction = "wnn.umap_cc", group.by = "Coarse_SingleR" , label = T 
 table(MLN$Coarse_SingleR) 
 
 library(reticulate)
-use_condaenv("/home/hartandrew/.conda/envs/scvi-env", required = TRUE)
+use_condaenv("/path/to/.conda/envs/scvi-env", required = TRUE)
 Sys.setenv(MPLBACKEND = "Agg")
 MLN <- FindClusters(MLN, resolution = 1, cluster.name = "Low_res_clusters", algorithm = 4,  group.singletons = T, graph.name = "harmony_rna_cc", random.seed = 20)
 DimPlot(MLN, reduction = "wnn.umap_cc", group.by = "Low_res_clusters" , label = T , repel = T, raster = T) 
