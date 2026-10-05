@@ -1,7 +1,5 @@
 # Description. This script will look at whether the Protein data and RNA data are aligned. Because of sparcity at the single cell level, each cell type will be pseudobulked for each independent mouse for both the normalized RNA and normalized ADT expression. A simple Pearson correlation is performed to determine the relationship between the protein and the RNA. For Proteins composed on more than one gene transcript, a single transript was chosen. This accounts for less than 10% of the proteins and I do not believe influences the results. Overall the results suggest fairly high correlation for proteins with more abundant proteins having beter correlations. The premade cocktail includes many proteins which might not be heavily expressed in the cells of the gut. These proteins show poor correlation. 
-
-# Figures S3A
-
+# # Figure S4A produced
 # Notably these correlations would likely improve if we removed the cell types for each protein that did not express the protein. (noise)
 
 # Load Libraries ----
@@ -200,6 +198,7 @@ final_plot <- (
     (p3 / plot_spacer()) + plot_layout(heights = c(n3, max_n - n3))
 ) + plot_annotation(title = "Uniform Bar Thickness Coherence Plot")
 
+# Figure S4A
 pdf(paste0(images, "/CITEseq_Coherence_Faceted_columns_intestine_FigureS3.pdf"), width = 12, height = 6)
 print(final_plot)
 dev.off()
@@ -456,6 +455,7 @@ adt_long_colored$Correlation_Level <- factor(adt_long_colored$Correlation_Level,
 pdf(paste0(images, "/CITEseq_Protein_Expression_Clean_Boxplots_MLN.pdf"), width = 8, height = 15)
 
 ggplot(adt_long_colored, aes(x = Expression, y = Protein, fill = Correlation_Level)) +
+  # We removed geom_jitter() to eliminate all dots/points
   geom_boxplot(outlier.shape = NA, alpha = 0.8) + 
   scale_fill_manual(values = c(
     "High (>0.5)" = "steelblue", 

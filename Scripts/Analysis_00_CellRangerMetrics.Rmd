@@ -10,7 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 #Description
 # All samples were run through Cell Ranger v 8.0.0 and the output was used for all downstream analyses. In this Script, the raw metrics from cell ranger are evaluated
-#Figure Panels produced : S1A, S1B
+#Figure Panels produced : S2A, S2B (Originally S1A-B)
 ##Load the Libraries----
 ```{r, warning=FALSE, error=FALSE}
 library(dplyr)
@@ -181,7 +181,7 @@ ReadNumber <- ggplot(combined_files2, aes(x = Sample, y = Mean.Reads.per.Cell, f
 
 ReadNumber
 
-ggsave(paste0(images, "/mRNA_readDepth_FigureS1.svg"), plot = last_plot(), width = 11, height = 4)
+ggsave(paste0(images, "/mRNA_readDepth_FigureS.svg"), plot = last_plot(), width = 11, height = 4)
 
 tissue_means <- combined_files2 %>%
   group_by(Tissue) %>%

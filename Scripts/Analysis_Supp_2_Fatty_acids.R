@@ -1,5 +1,5 @@
 # Description. This analysis will load the weight normalized abundance of Fatty acids measured in Nippostrongylus infected mouse samples and naive mouse samples. Samples include fecal/luminal contents of the colon, fecal/luminal contents of the distal small intestine, and scrapings of the distal small intestinal (likely capturing epithelial cells, mucus, etc)
-# Figure 5G and Figure S6C and Figure S6D data are generated in these scripts
+# Figure 4G and Figure S7C-D data are generated in these scripts
 
 # Load the Libraries----
 library(tidyverse)
@@ -19,6 +19,7 @@ library(pheatmap)
 library(RColorBrewer)
 
 
+
 # Read data -----
 data <- read_excel("/path/to/directory/FA_results_R.xlsx")
 colnames(data)
@@ -28,7 +29,7 @@ seurat <- "/path/to/directory/Seurat_Files"
 images <- "/path/to/directory/Images"
 CSV <- "/path/to/directory/CSV"
 
-# transform to long data format with analytes in one column and their values in another 
+# trasnform to long data format with analytes in one column and their values in another 
 data_long <- data %>%
   pivot_longer(
     cols = Palmitic_acid:FA_24_0, 
@@ -36,7 +37,7 @@ data_long <- data %>%
     values_to = "Value"
   )
 
-# Add Common Names. Notably, the common names are only best guesses for the fatty acids with multiple unsaturations. The saturated fatty acids are more definite as there aren't often alternate conformations 
+# Add Common Names. Notably, the ommon names are only best guesses for the fatty acids with multiple unsaturations. The saturated fatty acids are more definite as there aren't often alternate conformations 
 data_long$Common_Analyte <- data_long$Analyte
 data_long$Common_Analyte[data_long$Common_Analyte == "FA_18_2"] <- "Linoleic_acid"
 data_long$Common_Analyte[data_long$Common_Analyte == "FA_20_0"] <- "Arachidic_acid"
@@ -47,37 +48,6 @@ data_long$Common_Analyte[data_long$Common_Analyte == "FA_24_0"] <- "Lignoceric_a
 
 
 
-# Function for graphing all the data, separating by type - which type of sample
-make_fa_plots <- function(current_type) {
-  
-  # Filter for the sample type
-  type_data <- data_long %>% filter(Type == current_type)
-  
-  ggplot(type_data, aes(x = Condition, y = Value, fill = Condition)) +
-    stat_summary(fun = "mean", geom = "bar", alpha = 0.7, color = "black") +
-    stat_summary(fun.data = "mean_se", geom = "errorbar", width = 0.2) +
-    scale_fill_manual(values = c("#DBB075", "#D3D3D3"), breaks = c("Nippo", "Naive"))+
-    # jitter the overlayed dots
-    geom_jitter(width = 0.2, size = 2, color = "black", alpha = 0.8) +
-    # wrap by fatty acid
-    facet_wrap(~Analyte, scales = "free_y") + 
-    theme_classic() +
-    labs(
-      title = paste("Fatty Acid Levels -", current_type),
-      y = "Concentration (nmol/mg) ",
-      x = "Condition"
-    ) +
-    theme(legend.position = "none")
-}
-
-# Plot each
-unique_types <- unique(data$Type)
-
-for (t in unique_types) {
-  print(make_fa_plots(t))
-}
-
-unique(data_long$Analyte)
 
 # Make a long plot showing all the analytes for each sample type
 
@@ -90,7 +60,7 @@ make_combined_plot <- function(current_type) {
                  position = position_dodge(width = 0.8), 
                  alpha = 0.7, color = "black", width = 0.7) +
     # Error bars to dodged bars
-    stat_summary(fun.data = "mean_se", geom = "errorbar", 
+    stat_summary(fun.data = "mean_sd", geom = "errorbar", 
                  position = position_dodge(width = 0.8), 
                  width = 0.2) +
     geom_point(position = position_jitterdodge(jitter.width = 0.1, dodge.width = 0.8), 
@@ -102,7 +72,7 @@ make_combined_plot <- function(current_type) {
       y = "Value",
       x = "Fatty Acid Analyte"
     ) +
-    # Rotate X-axis labels
+    # Rotate X-axis labels so the names don't overlap
     theme(axis.text.x = element_text(angle = 45, hjust = 1))
 }
 
@@ -117,6 +87,7 @@ for (t in unique_types) {
 
 
 # Combine the plots into one 
+
 plot_list <- list()
 unique_types <- unique(data$Type)
 
@@ -131,7 +102,7 @@ for (i in seq_along(unique_types)) {
     stat_summary(fun = "mean", geom = "bar", 
                  position = position_dodge(width = 0.8), 
                  alpha = 0.7, color = "black", width = 0.7) +
-    stat_summary(fun.data = "mean_se", geom = "errorbar", 
+    stat_summary(fun.data = "mean_sd", geom = "errorbar", 
                  position = position_dodge(width = 0.8), 
                  width = 0.2) +
     geom_point(position = position_jitterdodge(jitter.width = 0.1, dodge.width = 0.8), 
@@ -161,14 +132,13 @@ a / b/ c
 ggsave("BArchart_Fatty_Acids_All_Samples.svg", plot = last_plot(), path = images, width = 7, height = 10)
 
 # Perform Stats and correct within each sample type
-stats_results <- data_long %>%
-  group_by(Type, Analyte) %>%  
-  t_test(Value ~ Condition) %>%
-  group_by(Type) %>%           
+
+fa_stats_results <- data_long %>%
+  group_by(Type, Analyte) %>%
+  wilcox_test(Value ~ Condition, exact = FALSE) %>%
+  group_by(Type) %>%
   adjust_pvalue(method = "BH") %>%
   add_significance()
-
-
 
 
 # Many of the individual comparisons seem significant but do not survive multiple comparisons corrections. However, there is a shared trend across all FAs and we can test whether this is significant 
@@ -195,8 +165,25 @@ print(permanova_result)
 # Graph the relationships of Fatty acids to Worm counts 
 
 data_nippo  <- data[data$Condition == "Nippo",]
-data_nippo$Worm_Count <- c(41, 41, 41, 32, 32, 32, 59, 59, 59, 68, 68, 68) # TWorm counts were alculated on the day of tissue sampling by APH prior to reporting of fatty acid results
+data_nippo$Worm_Count <- c(41, 41, 41, 32, 32, 32, 59, 59, 59, 68, 68, 68)
 
+# Make line plot for Stearic_acid
+ggplot(data_nippo[data_nippo$Type == "Ileum_S",], aes(x =Stearic_acid, y = Worm_Count)) +
+  # Individual data points labeled by tissue type
+  geom_point(aes(color = Type), size = 3, alpha = 0.8) +
+  # Add a linear regression line to show the relationship
+  geom_smooth(method = "lm", color = "black", se = FALSE, linetype = "dashed") +
+  # Add correlation coefficient
+  stat_cor(method = "pearson") + 
+  theme_classic() +
+  scale_color_brewer(palette = "Set1") +
+  labs(
+    title = "Stearic Acid vs. Parasite Burden",
+    subtitle = "Relationship in Nippo-infected Mice",
+    x = "Stearic Acid Concentration",
+    y = "Worm Count",
+    color = "Tissue Type"
+  )
 
 ggplot(data_nippo[data_nippo$Type == "Ileum_S",], aes(x =Oleic_acid, y = Worm_Count)) +
   geom_point(aes(color = Type), size = 5, alpha = 0.8) +
@@ -227,11 +214,42 @@ ggplot(data_nippo[data_nippo$Type == "Ileum_S",], aes(x =Palmitic_acid, y = Worm
 ggsave("Worm_vs_Palmitic_acid_line.svg", plot = last_plot(), path = images, width = 7, height = 7)
 
 
+
+
+data_nippo_long <- data_nippo %>%
+  filter(Type == "Ileum_S") %>%
+  pivot_longer(
+    cols = Palmitic_acid:FA_24_0, 
+    names_to = "Analyte", 
+    values_to = "Fatty_Acid_Value"
+  )
+
+
+ggplot(data_nippo_long, aes(x = Fatty_Acid_Value, y = Worm_Count)) +
+  geom_point(alpha = 0.8, color = "#DBB075", size = 2) +
+  geom_smooth(method = "lm", color = "black", se = FALSE, linetype = "dashed", size = 0.5) +
+  # Correlation coefficient (Pearson)
+  stat_cor(method = "pearson", label.y.npc = "top", size = 3) + 
+  facet_wrap(~Analyte, scales = "free_x") + 
+  theme_classic() +
+  labs(
+    title = "Fatty Acid Concentrations vs. Parasite Burden",
+    subtitle = "Ileum_S Tissue (Nippo-infected mice)",
+    x = "Fatty Acid Concentration (nmol/mg)",
+    y = "Worm Count"
+  ) +
+  theme(
+    strip.background = element_blank(),
+    strip.text = element_text(face = "bold")
+  )
+
+
+
 # Now switch and analyze the Bile Acids 
 #focused on the ileum
 # I removed anything where we couldnt detect the acid in at least 2 samples of one condition (this was 4 bile acids)
 
-data <- read_excel("/data/hartandrew/Projects/MIST/MIST_Analysis/Bile_Acids_R.xlsx")
+data <- read_excel("/path/to/directory/Bile_Acids_R.xlsx")
 
 
 data <- data[ , colSums(is.na(data)) < nrow(data)]
@@ -256,7 +274,7 @@ make_fa_plots <- function(current_Tissue) {
   ggplot(Tissue_data, aes(x = Treatment, y = Value, fill = Treatment)) +
 
     stat_summary(fun = "mean", geom = "bar", alpha = 0.7, color = "black") +
-    stat_summary(fun.data = "mean_se", geom = "errorbar", width = 0.2) +
+    stat_summary(fun.data = "mean_sd", geom = "errorbar", width = 0.2) +
 
     geom_jitter(aes(color = is_below_detection), 
                 width = 0.2, size = 2, alpha = 0.8) +
@@ -294,7 +312,7 @@ make_combined_plot <- function(current_Tissue) {
     stat_summary(fun = "mean", geom = "bar", 
                  position = position_dodge(width = 0.8), 
                  alpha = 0.7, color = "black", width = 0.7) +
-    stat_summary(fun.data = "mean_se", geom = "errorbar", 
+    stat_summary(fun.data = "mean_sd", geom = "errorbar", 
                  position = position_dodge(width = 0.8), 
                  width = 0.2) +
     geom_point(aes(color = is_below_detection, group = Treatment),
@@ -354,7 +372,7 @@ make_combined_boxplot <- function(current_Tissue) {
   # Get the ordering for this specific tissue
   tissue_order <- order_logic %>% 
     filter(Tissue == current_Tissue) %>%
-    arrange(l2fc) # Sort from largest negative to largest positive
+    arrange(l2fc) 
   
   # Filter data and apply the new factor order
   Tissue_data <- data_long %>% 
@@ -392,3 +410,99 @@ for (t in unique_Tissues) {
 }
 
 ggsave("Barchart_Bile_Acids_Ileum.svg", plot = last_plot(), path = images, width = 9, height = 6)
+
+# Graph only the change in bile acids 
+data_long <- data %>%
+  pivot_longer(
+    cols = `Alphamuricholic Acid`:`Taurolithocholic Acid`, 
+    names_to = "Analyte", 
+    values_to = "Value"
+  ) %>%
+  # Mark NAs before replacing them
+  mutate(is_below_detection = is.na(Value)) %>%
+  mutate(Value = replace_na(Value, 0.5)) %>% #replace with limit of detection
+  # Use log10(x+1) so 0s are plotted at the 0 baseline
+  mutate(log_val = log10(Value + 1))
+unique(data_long$Analyte)
+data_long <- data_long[data_long$Analyte %in% c("Taurodeoxycholic Acid", "Taurocholic Acid","Gammamuricholic Acid" ,
+                                                "Betamuricholic Acid", "Chenodeoxycholic Acid", "Cholic Acid" ),]
+
+# Order based on LogfC
+
+order_logic <- data_long %>%
+  group_by(Tissue, Analyte) %>%
+  summarise(
+    mean_nippo = mean(Value[Treatment == "Nippostrongylus infected"]),
+    mean_naive = mean(Value[Treatment == "Naïve"]),
+    
+    l2fc = log2((mean_nippo + 0.01) / (mean_naive + 0.01)),
+    .groups = "drop"
+  )
+
+
+make_combined_boxplot <- function(current_Tissue) {
+  
+  # Get the ordering for this specific tissue
+  tissue_order <- order_logic %>% 
+    filter(Tissue == current_Tissue) %>%
+    arrange(l2fc) # Sort from largest negative to largest positive
+  
+  # Filter data and apply the new factor order
+  Tissue_data <- data_long %>% 
+    filter(Tissue == current_Tissue) %>%
+    mutate(Analyte = factor(Analyte, levels = tissue_order$Analyte))
+  
+  ggplot(Tissue_data, aes(x = Analyte, y = log_val, fill = Treatment)) +
+    geom_boxplot(outlier.shape = NA, alpha = 0.7, 
+                 position = position_dodge(width = 0.8), 
+                 color = "black", width = 0.7) +
+    
+    geom_point(aes(color = is_below_detection, group = Treatment),
+               position = position_jitterdodge(jitter.width = 0.15, dodge.width = 0.8), 
+               size = 2, alpha = 0.8) +
+    stat_compare_means(
+      aes(group = Treatment), 
+      method = "wilcox.test", 
+      label = "p.signif", 
+      label.y = max(Tissue_data$log_val) * 1.1,
+      hide.ns = FALSE
+    ) +
+    scale_fill_manual(values = c("Nippostrongylus infected" = "#DBB075", "Naïve" = "#D3D3D3")) +
+    scale_color_manual(values = c("FALSE" = "black", "TRUE" = "red"), 
+                       labels = c("Detected", "Below Detection"),
+                       name = "Status") +
+    theme_classic() +
+    labs(
+      title = paste("Bile Acid Profile -", current_Tissue),
+      subtitle = "Ordered by Log2 Fold Change (Negative -> Positive)",
+      y = "Concentration log10(nmol/g + 1)"
+    ) +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1, face = "bold"),
+      legend.position = "bottom", 
+      axis.title.x = element_blank(), panel.grid.major.y = element_line(linetype = "dashed", color = "grey")
+    )
+}
+unique_Tissues <- unique(data_long$Tissue)
+
+for (t in unique_Tissues) {
+  print(make_combined_boxplot(t))
+}
+
+ggsave("Barchart_Bile_Acids_Ileum_selected.svg", plot = last_plot(), path = images, width = 6.5, height = 5)
+
+stats_table <- data_long %>%
+  group_by(Analyte, Tissue) %>%
+  summarise(
+    # Added exact = FALSE and correct = FALSE to handle ties cleanly
+    p_val = wilcox.test(Value ~ Treatment, 
+                        data = pick(everything()), 
+                        exact = FALSE, 
+                        correct = FALSE)$p.value,
+    .groups = "drop"
+  ) %>%
+  group_by(Tissue) %>%
+  mutate(p_adj = p.adjust(p_val, method = "BH")) %>%
+  mutate(is_significant = ifelse(p_adj < 0.05, "*", "ns"))
+
+print(stats_table)

@@ -9,7 +9,8 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 # Description: This Script is both exploratory and functions to produce many figures. First, MAST based DEG analyss was performed and the results analyzed through a variety of mehcanisms. Next, UCell enrichment analysis of gene sets was performed and analyzed 
-# Figures produced in this script include Figure S5A, Figure 4A, Figure 4B, Figure 4C, Figure 3C , Figure 3D, Figure 3F, Figure 3H, Figure S4E, Figure 3E, Figure 3G , Figure S4A, Figure S4B, Figure S4C, Figure S4D
+# Some figures have been moved from their original positions at the time of submission. Commented figure pointers should be mostly correct even if figure file names are not
+# Figures produced in this script include Figure S6A, Figure 3A, Figure 3B, Figure 3C, Figure 2C , Figure 2D, Figure 2F, Figure 2H, Figure S5E, Figure 2E, Figure 2G , Figure S5A, Figure S5B, Figure S5C, Figure S5D
 #Load Libraries 
 ```{r}
 library(Seurat)
@@ -50,7 +51,7 @@ options(future.globals.maxSize = 5000 * 1024^2)
 
 #Establish Directories
 ```{r} 
-getwd() #/home/hartandrew
+
 setwd("/path/to/analysis/directory")
 out <- "/path/to/analysis/directory/Output"
 version <- "/path/to/analysis/directory/Version"
@@ -275,7 +276,7 @@ ggsave( "CEllTypexCondition_DEG_BubblePie_Nolegend_sep2025.svg",  plot = last_pl
 
 
 deg_table_all <- all_degs_df %>%
-  filter(global_padj < 0.05)  # Or your preferred DEG threshold
+  filter(global_padj < 0.05)  # Or preferred DEG threshold
 
 # Create binary gene x condition matrix (1 = DE in any cell type)
 binary_mat <- deg_table_all %>%
@@ -537,7 +538,7 @@ ggplot(sig_degs, aes(x = condition, y = signed_logfc, fill = condition)) +
     legend.position = "none"
   )
 
-#Figure S5A produced here
+#Figure S6A produced here
 # Save
 ggsave(
   "Violin_DEG_logFC_by_Infection_Fig4_oct2025_transformed.svg",
@@ -616,7 +617,7 @@ ggsave( "Combined_DEGS_Enterocytes_Stem_Transit_Barplot_sep2025.svg",  plot = la
 ```{r}
 #Create a stacked bar chart of all the DEGs and the cell types they occur in  - this shows us numerically which cell types have the most DEGs
 # First looking only at upregulated DEGs
-#Figure 4A and Figure 4B produced here 
+#Figure 3A and Figure 3B produced here 
 Upregulated <- all_degs_df %>%
   filter(  global_padj < 0.05 & abs(avg_log2FC) > 0)
 
@@ -683,7 +684,7 @@ ggplot(deg_counts, aes(x = celltype, y = n_genes, fill = condition)) +
     panel.grid.minor = element_blank(), 
     text = element_text(fill = "black")
   )
-  #Figure 4A
+  #Figure 3A
 ggsave( "Stacked_BAr_DEGCounts_per_CellType_and_Infection_upregulated.svg",  plot = last_plot() , device = NULL, 
         path = images, width = 8,  height = 5,  units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
 
@@ -719,7 +720,7 @@ ggplot(deg_counts, aes(x = celltype, y = n_genes, fill = condition)) +
     panel.grid.minor = element_blank(), 
     text = element_text(fill = "black")
   )
-  #Figure 4B
+  #Figure 3B
 ggsave( "Stacked_BAr_DEGCounts_per_CellType_and_Infection_upregulated_LogFC.svg",  plot = last_plot() , device = NULL, 
         path = images, width = 8,  height = 5,  units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
 
@@ -911,7 +912,7 @@ upset(
       panel.grid.major.x = element_blank(),
       panel.grid.minor.x = element_blank()
     )))
-#Figure 4C
+#Figure 3C
 ggsave( "Upset_upregulated_DEGS_Entero_Stem_Transit_comparisons.svg",  plot = last_plot() , device = NULL, 
         path = images, width = 12,  height = 5,  units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
 
@@ -923,7 +924,7 @@ ggsave( "Upset_upregulated_DEGS_Entero_Stem_Transit_comparisons.svg",  plot = la
 #Enrichment Results 
 ```{r}
 # Load in the results from the Enrichment scoring and add as metadata to the object
-hallmark <- data.table::fread("/path/to/analysis/directory/CSV/Hallmark_ssGSEA_UCell.csv")
+hallmark <- data.table::fread("/path/to/CSV/Hallmark_ssGSEA_UCell.csv")
 rownames(hallmark) <- hallmark$cell_id
 all(rownames(hallmark) %in% colnames(Ileum_filt))
 hallmark <- hallmark[,-1] # remove cell id column 
@@ -933,7 +934,7 @@ Ileum_filt@meta.data <- Ileum_filt@meta.data %>%
 Ileum_filt@assays[genesets_hallmark] <- NULL
 Ileum_filt <- AddMetaData(Ileum_filt, metadata = hallmark)
 
-gs_IL27 <- data.table::fread("/path/to/analysis/directory/CSV/Il27_Ucell.csv")
+gs_IL27 <- data.table::fread("/path/to/CSV/Il27_Ucell.csv")
 gs_IL27b <- gs_IL27
 rownames(gs_IL27) <- gs_IL27$cell_id
 all(rownames(gs_IL27) %in% colnames(Ileum_filt))
@@ -945,8 +946,8 @@ Ileum_filt@assays[genesets_gs_IL27] <- NULL
 rownames(gs_IL27) <- gs_IL27b$cell_id
 Ileum_filt <- AddMetaData(Ileum_filt, metadata = gs_IL27)
 
-Th2 <- data.table::fread("/path/to/analysis/directory/CSV/Th2_ssGSEA_Ucell.csv")
-Th17 <- data.table::fread("/path/to/analysis/directory/CSV/Th17_ssGSEA_Ucell.csv")
+Th2 <- data.table::fread("/path/to/CSV/Th2_ssGSEA_Ucell.csv")
+Th17 <- data.table::fread("/path/to/CSV/Th17_ssGSEA_Ucell.csv")
 rownames(Th2) <- Th2$cell_id
 rownames(Th17) <- Th2$cell_id
 all(rownames(Th2) %in% colnames(Ileum_filt))
@@ -957,7 +958,7 @@ Ileum_filt <- AddMetaData(Ileum_filt, metadata = Th2)
 
 all(rownames(Th17) %in% colnames(Ileum_filt))
 Th17 <- Th17[, -1] 
-Th2 <- data.table::fread("/path/to/analysis/directory/CSV/Th2_ssGSEA_Ucell.csv")
+Th2 <- data.table::fread("/path/to/CSV/Th2_ssGSEA_Ucell.csv")
 rownames(Th17) <- Th2$cell_id
 genesets_Th17 <- colnames(Th17)
 
@@ -1129,7 +1130,7 @@ ggsave( "ssGSEA_Heatmap_Figure_v2.svg",  plot = last_plot() , device = NULL,
 ```
 
 ```{r}
-#Fgiure 3C is derived from here
+#Figure 2C is derived from here
 # Extract the information for Ifng to make a bubble plot showing that Crypto has increased expression
 celltype_col <- "secondlevel"   
 condition_col <- "InfectionStatus" 
@@ -1164,7 +1165,7 @@ ggplot(bubble_data, aes(x = secondlevel, y = InfectionStatus)) +
     size = "% expressing",
     fill = "Mean expression"
   ) + coord_flip()
-# Figure 3C
+# Figure 2C
 ggsave( "IfngExpression_allsamples_Fig2.svg",  plot = last_plot() , device = NULL, path = images, width = 10,  height = 11,  units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
 
 ```
@@ -1173,7 +1174,7 @@ ggsave( "IfngExpression_allsamples_Fig2.svg",  plot = last_plot() , device = NUL
 
 ```{r}
 #Heatmaps of relevant pathways
-#Save plots for figure 3 Figure 3D, Figure 3F, Figure 3H, Figure S4E
+#Save plots for figure 2 Figure 2D, Figure 2F, Figure 2H, Figure S5E
 
 heat[["HALLMARK_INTERFERON_ALPHA_RESPONSE"]] + theme( title = element_blank())
 ggsave("GSVA_hallmark_IFNa_AllSamples.svg", plot = last_plot() ,device = NULL,
@@ -1432,7 +1433,7 @@ heat_mln[['IL27_Upregulated_mouse']]
 ```
 
 ```{r}
-##Figure 3E, Figure 3G 
+##Figure 2E, Figure 2G 
 heat_mln[["HALLMARK_INTERFERON_GAMMA_RESPONSE"]] + theme( title = element_blank())
 ggsave("HAllmark_IFNG_Ucell_Heatmap_AllSamples_MLN.svg", plot = last_plot() ,device = NULL,
   path = images, scale = 1, width = 8, height = 3.5, limitsize = TRUE, bg = NULL)
@@ -1448,7 +1449,7 @@ ggsave("GOBP_T_HELPER_17_CELL_Ucell_Heatmap_AllSamples_MLN.svg", plot = last_plo
 
 #Supplement Graphing 
 ```{r}
-#Figure S4A, Figure S4B, Figure S4C, Figure S4D
+#Figure S5A, Figure S5B, Figure S5C, Figure S5D
 Correctcolors <- c(  "#B78CBA",   "#1170AA",  
   "#FCB13F",  
   "#60BFC1",  

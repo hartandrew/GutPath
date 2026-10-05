@@ -1,5 +1,5 @@
 # Description: This script will take as input, the Cell Ranger pipeline output for each sample. I will load the samples in R using Seurat and it will filter samples and perform normalization of the ADT reads using dsb.  Metadata about each experiment is added and the objects are merged for further analysis
-#Figure Panels produced : Figure S1C Model of Analysis Approach
+#Figure Panels produced : Figure S2C Model of Analysis Approach
 # Load the Libraries 
 library(Seurat)
 library(Signac)
@@ -100,7 +100,7 @@ Sample_directory$MtCutoff <- ifelse(
 
 
 # Create a function that will load the data, filter, and prep for QC evaluation
-# This function is specifically designed for a variety of inputs fitting MIST experiments including the infection, the mouse name, folder name of the Cellranger output, etc. The output will produce a seurat object for each sample
+# This function is specifically designed for a variety of inputs fitting GutPath experiments including the infection, the mouse name, folder name of the Cellranger output, etc. The output will produce a seurat object for each sample
 process_sample_mist_meta <- function(sample_id,        # Name of the variable 
                                      folder_id, # Folder containing the Cellranger output       # Name of the folder 
                                      mouse_id,  # unique Mouse identifier        
@@ -108,8 +108,8 @@ process_sample_mist_meta <- function(sample_id,        # Name of the variable
                                      infection_status,  # Name of specific infection (eg "Cryptosporidium" or  "Naive")
                                      mt_cutoff,        # 0.05 or 0.20 for this project
                                      project_dir , 
-                                     isotype_controls, # The specific names given to the CITEseq ADT probes that are isotype controls
-                                     image_output_dir = NULL) # A path to where images should be saved
+                                     isotype_controls, # specific names given to the CITEseq ADT probes that are isotype controls
+                                     image_output_dir = NULL) # path to save images
                                       {
   
   message(paste("Processing:", sample_id, "| Mouse:", mouse_id, "| Tissue:", tissue_type))

@@ -1,6 +1,6 @@
 # Description -----
 # We have performed probe-based Xenium analysis on intestinal tissue and we have more recently partnered with Complete Genomics to perform Stereoseq analyses of intestinal tissue as well as brain tissue. The SAW pipeline produced by Complete Genomics is used for analysis of STEREOSeq samples. I will attempt to read in the data and explore it
-# Figures S9G
+# Figure S10G
 # Load libraries ----
 library(Seurat)
 library(Signac)
@@ -412,7 +412,7 @@ p_final_nos2 <- SpatialDimPlot(combined_stereo_filt,
   labs(title = "Yersinia Localization (Nos2 Vertically Reflected & Re-Anchored)")
 
 print(p_final_nos2)
-
+# Figure S10G
 ggsave( "CoarseCellType_Yersinia_SpatialFeature_Yps_enrichment_Yersinia_transcripts_Nos2.pdf",  plot = last_plot() , device = NULL,  path = images,  scale = 1,  width = 15 ,  height = 13,  units = c("in"),  dpi = 600)
 
 

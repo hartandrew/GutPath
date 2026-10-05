@@ -35,7 +35,7 @@ library(UCell)
 
 #Perform GSEA ----
 
-# Load your Xenium Seurat object (already loaded in your environment)
+# Load Xenium Seurat object (in my case, already loaded in the environment below)
 load("/path/to/data/MIST/Xenium_Yp_2025/Subclustered_Xenium.RData")
 
 # Load Gene Sets

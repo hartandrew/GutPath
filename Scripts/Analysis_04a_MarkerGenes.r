@@ -202,7 +202,7 @@ mln_check
 
 #Save the Seurat files as H5ad files to then use
 library(reticulate)
-use_python("/home/hartandrew/.conda/envs/sccellfie_env/bin/python", required = TRUE)
+use_python("/path/to/envs/sccellfie_env/bin/python", required = TRUE)
 library(sceasy)
 
 

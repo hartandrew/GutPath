@@ -1,5 +1,6 @@
 #Description: Here I describe how the Xenium data was processed including resegmentation of the cells via Proseg and then analyzed. 
-#Figures produced Figure 7A, Figure S8B, Figure S8C, Figure S8D, Figure 7B, Figure 7C, Figure 7D, figure 7E, #Figure 7F, Figure 7G, Figure 7H, Figure 7I Figure 7J
+# Some figures have been moved from their original positions at the time of submission. Commented figure pointers should be mostly correct even if figure file names are not
+#Figures produced Figure 6A, Figure S9C, Figure S9D, Figure 8B, Figure 8C, Figure 8D, figure 8E, #Figure 8F, Figure 8G, Figure 8H, Figure 8I Figure 8J
 
 #After Xenium machine was finalized, the raw data was then used through Proseg (PMID: 40404994). Proseg is a probabilistic cell segmentation algorithm for spatial data. The Proseg to Xenium Ranger results were utilized here
 
@@ -24,11 +25,11 @@ library(monocle3)
 library(SingleR)
 library(gridExtra)
 library(gt)
-library(arrow) #This is a package used in the custom ReadXenium function needed after10X changed their output nomenclature
+library(arrow) #This is a package used in the custom ReadXenium function needed after 10X changed their output nomenclature
 library(remotes)
 options(future.globals.maxSize = 20000 * 1024^2)
 library(FNN)
-library(ClusterR)   # For MiniBatchKmeans
+library(ClusterR)   
 library(tibble)
 library(qs2)
 library(ggrepel)
@@ -36,7 +37,6 @@ library(ggrepel)
 library(sf) #Used by functions in Seurat to process some types of Xenium data
 
 #Create Directories----
-getwd() #/home/hartandrew
 setwd("/path/to/data/MIST/Xenium_Yp_2025/")
 out <- "/path/to/data/MIST/Xenium_Yp_2025/Output/"
 seurat <- "/path/to/data/MIST/Xenium_Yp_2025/Seurat/"
@@ -559,7 +559,7 @@ ReadNumber <- ggplot(combined_files, aes(x = orig.ident, y = median_counts, fill
   ylab("median UMI per cell")
 
 ReadNumber
-#Figure S7C
+#Figure S9C
 ggsave(paste0(images, "/filtered_median_nCount_Xenium.svg"), plot = last_plot(), width = 11, height = 4)
 
 
@@ -585,7 +585,7 @@ ReadNumber <- ggplot(combined_files, aes(x = orig.ident, y = median_genes, fill 
   ylab("Median Genes per Cell")
 
 ReadNumber
-#Figure S7C
+#Figure S9C
 ggsave(paste0(images, "/filtered_Median_genes_per_cell.svg"), plot = last_plot(), width = 11, height = 4)
 
 ReadNumber <- ggplot(combined_files, aes(x = orig.ident, y = n_cells, fill = InfectionStatus)) +
@@ -608,7 +608,7 @@ ReadNumber <- ggplot(combined_files, aes(x = orig.ident, y = n_cells, fill = Inf
   ylab("Filtered # of Cells")
 
 ReadNumber
-#Figure S7C
+#Figure S9C
 ggsave(paste0(images, "/filtered_cell_number_xenium.svg"), plot = last_plot(), width = 11, height = 4)
 
 #Save a Umap of the Coarse assignments ----
@@ -658,7 +658,7 @@ ggplot(umap_data[!umap_data$cluster == "Unknown",], aes(x = umap_1, y = umap_2, 
         axis.ticks.y = element_blank(), axis.text.y = element_blank(),
         legend.position = "none",
         strip.background = element_blank())
-#Figure S7D
+#Figure S9D
 ggsave( "Ileum_UMAP_CoarseCellType_NoLabels_Unlabeled_removed.png",  plot = last_plot() , device = NULL,  path = images,  scale = 1,  width = 9,  height = 9,  units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
 
 
@@ -958,7 +958,7 @@ spatial_umap + geom_text_repel(data = centroids, aes(label = cluster), size = 4,
 ) 
 ggsave( "Epithelial_subcluster_Naive_UMAP_FineCell.svg",  plot = last_plot() , device = NULL,  path = images,  scale = 1,  width = 9,  height = 9,  units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
 spatial_umap
-#Figure 7A
+#Figure 6A
 ggsave( "Epithelial_subcluster_Naive_UMAP_FineCel_NoLabels.svg",  plot = last_plot() , device = NULL,  path = images,  scale = 1,  width = 9,  height = 9,  units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
 ggsave( "Epithelial_subcluster_Naive_UMAP_FineCel_NoLabels.png",  plot = last_plot() , device = NULL,  path = images,  scale = 1,  width = 9,  height = 9,  units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
 spatial_umap +theme(legend.position = "bottom")
@@ -981,7 +981,7 @@ spatial_umap + geom_text_repel(data = centroids, aes(label = cluster), size = 4,
 ) 
 ggsave( "Epithelial_subcluster_Yersinia_UMAP_FineCell.svg",  plot = last_plot() , device = NULL,  path = images,  scale = 1,  width = 9,  height = 9,  units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
 spatial_umap
-#Figure 7A
+#Figure 6A
 ggsave( "Epithelial_subcluster_Yersinia_UMAP_FineCel_NoLabels.svg",  plot = last_plot() , device = NULL,  path = images,  scale = 1,  width = 9,  height = 9,  units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
 ggsave( "Epithelial_subcluster_Yersinia_UMAP_FineCel_NoLabels.png",  plot = last_plot() , device = NULL,  path = images,  scale = 1,  width = 9,  height = 9,  units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
 
@@ -1111,7 +1111,7 @@ ImageFeaturePlot(
   min.cutoff = min_val,
   max.cutoff = max_val
 )+ scale_fill_gradient(low = "grey", high = "#D10000", limits = c(0, 4))
-#figure 7J
+#figure 6J
 ggsave( "Saa1_FeatureImage_Yersinia1_Image.svg",  plot = last_plot() , device = NULL,  path = images,  scale = 1,  width = 6,  height = 6,  units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
 
 
@@ -1120,7 +1120,7 @@ ImageFeaturePlot(
   fov = "naive1",
   features = "Saa1"
 ) + scale_fill_gradient(low = "grey", high = "#D10000", limits = c(0, 4))
-#figure 7J
+#figure 6J
 ggsave( "Saa1_FeatureImage_Naive1_Image.svg",  plot = last_plot() , device = NULL,  path = images,  scale = 1,  width = 6,  height = 6,  units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
 
 
@@ -1229,7 +1229,7 @@ Naive_subset$progress <- inside_cells$progress[match(Cells(Naive_subset), inside
 
 
 ImageFeaturePlot(Naive_subset, "progress")
-#Figure S7F
+#Figure S10B
 ggsave( "Naive1_Spiral_Progression_Visualization.svg",  plot = last_plot() , device = NULL,  path = images,  scale = 1,  width = 6,  height = 6,  units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
 
 
@@ -1524,7 +1524,7 @@ Yersinia_subset$progress <- inside_cells$progress[match(Cells(Yersinia_subset), 
 
 
 ImageFeaturePlot(Yersinia_subset, "progress")
-#Figure S7F
+#Figure S10B
 ggsave( "Yersinia1_Spiral_Progression_Visualization.svg",  plot = last_plot() , device = NULL,  path = images,  scale = 1,  width = 6,  height = 6,  units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
 
 Idents(all_objects_filtered) <- "Coarse_SingleR"
@@ -1606,7 +1606,7 @@ Yersinia_subset_epi$Progress_Highlight <- ifelse(
 # Check the counts
 table(Yersinia_subset_epi$Progress_Highlight)
 
-# Now you can use it for coloring in ImageDimPlot
+# Coloing for ImageDimPlot
 ImageDimPlot(
   Yersinia_subset_epi,
   fov = "yersinia1",
@@ -2022,7 +2022,7 @@ ggplot(dat_saa1, aes(x = progress_bin, y = smooth, color = Condition)) +
   labs(x = "Progress",
        y = "Smoothed Mean Saa1 Enrichment") +
   theme(axis.text = element_text(color = "black"))
-#Figure 7C
+#Figure 6C
 ggsave( "LineGraph_Yps_enrichment_along_Distance_Sample1_combined.svg",  plot = last_plot() , device = NULL,  path = images,  scale = 1,  width = 6,  height = 1.5,  units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
 
 
@@ -2077,7 +2077,7 @@ ggplot(dat_il1a, aes(x = progress_bin, y = smooth, color = Condition)) +
   labs(x = "Progress",
        y = "Smoothed Mean Il1a Expression") +
   theme(axis.text = element_text(color = "black"))
-  #Figure 7B
+  #Figure 6B
 ggsave( "LineGraph_Il1a_exp_along_Distance_Sample1_combined.svg",  plot = last_plot() , device = NULL,  path = images,  scale = 1,  width = 6,  height = 1.5,  units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
 
 
@@ -2092,7 +2092,7 @@ ggplot(dat_il22, aes(x = progress_bin, y = smooth, color = Condition)) +
   labs(x = "Progress",
        y = "Smoothed Mean Il22 Expression") +
   theme(axis.text = element_text(color = "black"))
-  #Figure 7G
+  #Figure 6G
 ggsave( "LineGraph_Il22_exp_along_Distance_Sample1_combined.svg",  plot = last_plot() , device = NULL,  path = images,  scale = 1,  width = 6,  height = 1.5,  units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
 
 
@@ -2122,7 +2122,7 @@ ggplot(dat_Il18rap, aes(x = progress_bin, y = smooth, color = Condition)) +
   labs(x = "Progress",
        y = "Smoothed Mean Il18rap Expression") +
   theme(axis.text = element_text(color = "black"))
-  #Figure 7E
+  #Figure 6E
 ggsave( "LineGraph_Il18rap_exp_along_Distance_Sample1_combined.svg",  plot = last_plot() , device = NULL,  path = images,  scale = 1,  width = 6,  height = 1.5,  units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
 
 
@@ -2139,7 +2139,7 @@ ggplot(dat_tnf, aes(x = progress_bin, y = smooth, color = Condition)) +
   labs(x = "Progress",
        y = "Smoothed Mean TNfa Expression") +
   theme(axis.text = element_text(color = "black"))
-  #Figure 7B
+  #Figure 6B
 ggsave( "LineGraph_TNFa_exp_along_Distance_Sample1_combined.svg",  plot = last_plot() , device = NULL,  path = images,  scale = 1,  width = 6,  height = 1.5,  units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
 
 #il18
@@ -2154,7 +2154,7 @@ ggplot(dat_il18, aes(x = progress_bin, y = smooth, color = Condition)) +
   labs(x = "Progress",
        y = "Smoothed Mean Il18 Expression Epithelial") +
   theme(axis.text = element_text(color = "black"))
-  #Figure 7E
+  #Figure 6E
 ggsave( "LineGraph_Il18_exp_along_Distance_Sample1_combined.svg",  plot = last_plot() , device = NULL,  path = images,  scale = 1,  width = 6,  height = 1.5,  units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
 
 
@@ -2170,7 +2170,7 @@ ggplot(dat_saa1b, aes(x = progress_bin, y = smooth, color = Condition)) +
   labs(x = "Progress",
        y = "Smoothed Mean Saa1 Expression") +
   theme(axis.text = element_text(color = "black"))
-  #figure 7I
+  #figure 6I
 ggsave( "LineGraph_Saa1_exp_along_Distance_Sample1_combined.svg",  plot = last_plot() , device = NULL,  path = images,  scale = 1,  width = 6,  height = 1.5,  units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
 
 
@@ -2187,7 +2187,7 @@ ggplot(dat_my, aes(x = progress_bin, y = smooth, color = Condition)) +
   labs(x = "Progress",
        y = "Smoothed % Myeloid") +
   theme(axis.text = element_text(color = "black"))
-#Figure 7B
+#Figure 6B
 ggsave( "LineGraph_Freq_Myeloid_along_Distance_Sample1_combined.svg",  plot = last_plot() , device = NULL,  path = images,  scale = 1,  width = 6,  height = 1.5,  units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
 
 
@@ -2283,7 +2283,7 @@ pheatmap(
   main = "Genes ordered by spread from peak (row scaled)", 
   border_color = NA
 )
-#Figure 7H
+#Figure 6H
 svg(paste0(images, "/Saa1_genes_heatmap_dispersion_along_PG.svg"), width = 4, height = 6)
 
 # Plot heatmap
@@ -2391,438 +2391,6 @@ pheatmap(
 )
 dev.off()
 
-# Examine the Spread of Yersinia ENterocyte DEGS in heatmap fashion around the PGs----
-
-unique(all_objects_filtered$secondlevel)
-
-all_objects_filtered$secondlevel[is.na(all_objects_filtered$secondlevel)] <- "Unlabeled"
-DimPlot(all_objects_filtered, reduction = "umap", group.by = "secondlevel")
-
-all_objects_filtered$temp <- all_objects_filtered$secondlevel
-all_objects_filtered$temp[all_objects_filtered$temp %in% c("Early Enterocyte", "Middle Enterocyte", "Late Enterocyte")] <- "Enterocytes"
-all_objects_filtered$temp <- paste0(all_objects_filtered$InfectionStatus, "_",  all_objects_filtered$temp)
-Idents(all_objects_filtered) <- "temp"
-
-for (i in 1:length(all_objects_filtered@assays$SCT@SCTModel.list)) {
-  slot(object = all_objects_filtered@assays$SCT@SCTModel.list[[i]], name = "umi.assay") <- "Xenium"
-}
-#all_objects_filtered <- PrepSCTFindMarkers(all_objects_filtered)
-
-enterocytes_Yersinia_deg <- FindMarkers(
-  all_objects_filtered, 
-  ident.1 = "Yersinia_Enterocytes", 
-  ident.2 = "Naive_Enterocytes", 
-  assay = "SCT",
-  only.pos = TRUE,
-  min.pct = 0.1,
-  recorrect_umi = FALSE
-)
-
-
-genes_to_plot <- rownames(enterocytes_Yersinia_deg)
-
-library(tidyverse)
-expr_data <- FetchData(
-  Yersinia_subset_epi,
-  vars = c(genes_to_plot, "progress", "secondlevel")
-)
-
-expr_data <- expr_data %>%
-  filter(progress >= 40 & progress <= 65) %>% # Filter for the range containing the PG of interest
-  filter(secondlevel %in% c("Early Enterocyte" ,  "Late Enterocyte" , "Middle Enterocyte"))
-
-spread_stats <- expr_data %>%
-  pivot_longer(cols = all_of(genes_to_plot), names_to = "gene", values_to = "expression") %>%
-  group_by(gene) %>%
-  summarise(
-    center = sum(progress * expression) / sum(expression), # weighted mean
-    spread = sqrt(sum(expression * (progress - center)^2) / sum(expression)), # weighted SD
-    .groups = "drop"
-  )
-
-
-#Create a MAtrix
-bin_size <- 0.2
-heatmap_data <- expr_data %>%
-  mutate(progress_bin = floor(progress / bin_size) * bin_size) %>%
-  pivot_longer(cols = all_of(genes_to_plot), names_to = "gene", values_to = "expression") %>%
-  group_by(gene, progress_bin) %>%
-  summarise(mean_expr = mean(expression, na.rm = TRUE), .groups = "drop") %>%
-  pivot_wider(names_from = progress_bin, values_from = mean_expr, values_fill = 0)
-
-#heatmap_data <- heatmap_data[rowMeans(heatmap_data[,2:ncol(heatmap_data)]) > 0.2, ]
-
-# Convert to matrix for pheatmap
-mat <- as.matrix(heatmap_data[,-1])
-rownames(mat) <- heatmap_data$gene
-library(pheatmap)
-pheatmap(
-  mat,
-  cluster_rows = TRUE,
-  cluster_cols = FALSE,
-  color = colorRampPalette(c("white", "red"))(50),
-  main = "Expression along progress (45-61)"
-)
-
-
-heatmap_data_ordered <- heatmap_data %>%
-  arrange(match(gene, spread_stats$gene[order(spread_stats$spread)]))
-
-mat_ordered <- as.matrix(heatmap_data_ordered[,-1])
-rownames(mat_ordered) <- heatmap_data_ordered$gene
-
-pheatmap(
-  mat_ordered,
-  cluster_rows = FALSE,
-  cluster_cols = FALSE,
-  color = colorRampPalette(c("white", "red"))(50),
-  main = "Genes ordered by spread from peak", 
-  border_color = NA
-)
-
-#Scaled
-heatmap_data_ordered <- heatmap_data %>%
-  arrange(match(gene, spread_stats$gene[order(spread_stats$spread)]))
-
-# Convert to matrix and scale each row (gene)
-mat_ordered <- as.matrix(heatmap_data_ordered[1:nrow(heatmap_data_ordered),-1])
-rownames(mat_ordered) <- heatmap_data_ordered[1:nrow(heatmap_data_ordered),]$gene
-
-# Row-wise scaling: subtract mean, divide by SD for each gene
-mat_scaled <- t(scale(t(mat_ordered)))  
-
-# Heatmap
-pheatmap(
-  mat_scaled,
-  cluster_rows = FALSE,
-  cluster_cols = FALSE,
-  color = colorRampPalette(c("navy",  "yellow"))(50),
-  main = "Genes ordered by spread from peak (row scaled)", 
-  border_color = NA
-)
-
-library(svglite)
-
-svglite(
-  filename = paste0(images, "/Yersinia_total_enterocytes_DEG_heatmap_dispersion_along_PG.svg"),
-  width = 4,
-  height = 20
-)
-
-pheatmap(
-  mat_scaled,
-  cluster_rows = FALSE,
-  cluster_cols = FALSE,
-  color = colorRampPalette(c("navy", "yellow"))(50),
-  main = "Genes ordered by spread from peak (row scaled)",
-  border_color = NA
-)
-
-dev.off()
-# Figure S9C above
-# Figure S9d Figure S9E Figure S9F below
-
-
-# Make LineGraphs of selected Genes that are PG enriched and PG not enriched 
-# Based on the above heatmap 
-
-# this bit of code helps me identify which genes are enriched close to the PG in Yersinia but were not originally identified in the Saa1 gene set. And which are enriched in broadly in Yersinia enterocytes  - not restricted to the PG
-distint_genes <- rownames(enterocytes_Yersinia_deg)
-distint_genes <- distint_genes[!distint_genes %in% Saa1_genes]
-distint_genes <- enterocytes_Yersinia_deg[rownames(enterocytes_Yersinia_deg) %in% distint_genes,]
-distint_genes <- distint_genes[rownames(mat_scaled), , drop = FALSE]
-
-# Now makes graphs for these genes 
-library(zoo)
-library(dplyr)
-bin_and_smooth <- function(seu, feature, bin_width = 0.2, k = 6) {
-  df <- data.frame(
-    progress = seu$progress,
-    value = FetchData(seu, feature)[,1]
-  ) %>% na.omit()
-  
-  df %>%
-    mutate(progress_bin = floor(progress / bin_width) * bin_width) %>%
-    group_by(progress_bin) %>%
-    summarise(mean_val = mean(value, na.rm = TRUE), .groups = "drop") %>%
-    arrange(progress_bin) %>%
-    mutate(smooth = rollapply(mean_val, width = k, FUN = mean, fill = NA, align = "center"))
-}
-
-
-#Set Highlight
-highlight_regions <- data.frame(
-  xmin = c(12, 51),
-  xmax = c(16,  55),
-  ymin = -Inf,
-  ymax = Inf
-)
-
-
-
-#Slc40a1
-dat_Slc40a1_y <- bin_and_smooth(Yersinia_subset, "Slc40a1") %>%
-  mutate(Condition = "Yersinia")
-dat_Slc40a1_n <- bin_and_smooth(Naive_subset, "Slc40a1") %>%
-  mutate(Condition = "Naive")
-dat_Slc40a1 <- bind_rows(dat_Slc40a1_y, dat_Slc40a1_n)
-
-
-ggplot(dat_Slc40a1, aes(x = progress_bin, y = smooth, color = Condition)) +
-  geom_line(linewidth = 1.4) +
-  geom_rect(data = highlight_regions,
-            aes(xmin = xmin, xmax = xmax, ymin = -Inf, ymax = Inf),
-            fill = "grey80", alpha = 0.3, inherit.aes = FALSE) +
-  theme_minimal() +
-  #ylim(0.25,0.4)+ 
-  geom_vline(xintercept = c(43, 62, 65, 95),
-             linetype = "dotted", linewidth = 0.8, alpha = 0.8) +
-  scale_color_manual(values = c("#B78CBA", "#D17A00"), breaks = c("Naive", "Yersinia"))+
-  labs(x = "Progress",
-       y = "Smoothed Mean Slc40a1 Enrichment") +
-  theme(axis.text = element_text(color = "black"))
-
-ggsave( "Linegraph_Yersinia_Naive_Slc40a1_expression.svg",  plot = last_plot() , device = NULL,  path = images,  scale = 1,  width = 6,  height = 1.5,  units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
-
-
-
-library(tidyverse)
-library(patchwork)
-
-#Genes of interest
-genes_to_plot <- c(
-  "Mboat1", "Ero1l", "Slc16a3", "Slc16a1", # PG-focused
- "Stat1", "Stat3",  "Elf3",  "Slc40a1", "Fgf15" # Broad
-)
-
-
-make_gene_plot <- function(gene_name, is_bottom = FALSE) {
-  
-  dat_y <- bin_and_smooth(Yersinia_subset, gene_name) %>% mutate(Condition = "Yersinia")
-  dat_n <- bin_and_smooth(Naive_subset, gene_name) %>% mutate(Condition = "Naive")
-  dat_combined <- bind_rows(dat_y, dat_n)
-  
-  p <- ggplot(dat_combined, aes(x = progress_bin, y = smooth, color = Condition)) +
-    geom_line(linewidth = 1.2) +
-    geom_rect(data = highlight_regions,
-              aes(xmin = xmin, xmax = xmax, ymin = -Inf, ymax = Inf),
-              fill = "grey80", alpha = 0.3, inherit.aes = FALSE) +
-    #geom_vline(xintercept = c(43, 62, 65, 95), linetype = "dotted", linewidth = 0.6, alpha = 0.8) +
-    scale_color_manual(values = c("Naive" = "#B78CBA", "Yersinia" = "#D17A00")) +
-    theme_minimal() +
-    labs(y = gene_name, x = NULL) + # Gene name on Y-axis for space saving
-    theme(
-      axis.text = element_text(color = "black", size = 8),
-      axis.title.y = element_text(angle = 0, vjust = 0.5, face = "bold"), # Horizontal gene labels
-      legend.position = "none" # Remove individual legends
-    )
-
-  if (!is_bottom) {
-    p <- p + theme(axis.text.x = element_blank(), axis.title.x = element_blank())
-  } else {
-    p <- p + labs(x = "Progress")
-  }
-  return(p)
-}
-
-
-plot_list <- lapply(seq_along(genes_to_plot), function(i) {
-  make_gene_plot(genes_to_plot[i], is_bottom = (i == length(genes_to_plot)))
-})
-
-
-# wrap_plots with a single column
-final_stack <- wrap_plots(plot_list, ncol = 1) + 
-  plot_layout(guides = "collect") & 
-  theme(legend.position = "bottom")
-
-
-ggsave(
-  filename = "Stacked_Yersinia_vs_Naive_Expression.svg",
-  plot = final_stack,
-  path = images,
-  width = 6,
-  height = 16, 
-  device = "svg"
-)
-
-
-# Replot the expression heatmap after labeling the specific genes that I have pulled out 
-
-show_genes <- c("Mboat1", "Ero1l", "Slc16a3", "Slc16a1", "Stat1", "Stat3", "Elf3", "Slc40a1", "Fgf15")
-
-custom_labels <- ifelse(rownames(mat_scaled) %in% show_genes, rownames(mat_scaled), "")
-
-
-svglite(
-  filename = paste0(images, "/Yersinia_total_enterocytes_DEG_heatmap_selective_labels.svg"),
-  width = 4,
-  height = 13
-)
-
-pheatmap(
-  mat_scaled,
-  cluster_rows = FALSE,
-  cluster_cols = FALSE,
-  labels_row = custom_labels, # Use the custom labels here
-  color = colorRampPalette(c("navy", "yellow"))(50),
-  main = "Key Genes along PG Dispersion",
-  border_color = NA,
-  fontsize_row = 8 # You can make these a bit bigger since there are fewer
-)
-
-dev.off()
-
-
-# Validate the Pseudotime and the any changes that we can see ----
-unique_genes_toexamine <- c("Slc10a2", "Slc12a2", "Slc12a8", "Slc13a1", "Slc1a1", "Slc1a5", "Slc20a1", "Slc23a4", "Slc25a39", "Slc25a4", "Slc25a48", "Slc25a5", "Slc26a3", "Slc28a1", "Slc28a2", "Slc28a3", "Slc2a1", "Slc35b1", "Slc40a1", "Slc51a", "Slc51b", "Slc5a12", "Slc5a4b", "Slc66a2", "Slc6a6", "Slc7a1", "Slc7a5", "Slc9a3", "Slco3a1")
-unique_genes_toexamine <- unique_genes_toexamine %in% rownames(all_objects_filtered@assays$SCT)
-
-
-
-# Determine whether the Saa1 enrichment is significant between pyogranuloma and non pyogranuloma region----
-# Select the same regions for a PG and Non PG
-meta1 <- data.frame(Yersinia_subset$Saa1_Gene_Lists, Yersinia_subset$secondlevel, Yersinia_subset$progress)
-colnames(meta1) <- c("Saa1_enrichment", "secondlevel", "progress")
-meta1$ProgressClass <- NA
-meta1$ProgressClass[meta1$progress >=12 & meta1$progress <=16] <- "PG1"
-meta1$ProgressClass[meta1$progress >=51 & meta1$progress <=55] <- "PG2"
-meta1$ProgressClass[meta1$progress >=65 & meta1$progress <=95] <- "Non-PG"
-meta1 <- meta1 %>% 
-  filter(secondlevel %in% c("Middle Enterocyte", "Late Enterocyte", "Early Enterocyte")) %>% 
-    filter(ProgressClass %in% c("PG1", "PG2", "Non-PG"))
-  
-meta2 <- data.frame(Naive_subset$Saa1_Gene_Lists, Naive_subset$secondlevel, Naive_subset$progress) 
-colnames(meta2) <- c("Saa1_enrichment", "secondlevel", "progress")
-meta2$ProgressClass <- "Naive"
-meta2 <- meta2 %>% 
-  filter(secondlevel %in% c("Middle Enterocyte", "Late Enterocyte", "Early Enterocyte"))
-
-meta_compare <- rbind(meta1, meta2)
-
-
-meta_compare <- meta_compare[!is.na(meta_compare$Saa1_enrichment),] #remove NA
-
-library(rstatix)
-library(tidyverse)
-
-# Global Test (Kruskal-Wallis)
-global_test <- meta_compare %>%
-  kruskal_test(Saa1_enrichment ~ ProgressClass)
-
-print(global_test)
-
-# Pairwise Comparisons (Wilcoxon)
-# This compares every category to every other category
-pairwise_results <- meta_compare %>%
-  wilcox_test(Saa1_enrichment ~ ProgressClass, p.adjust.method = "fdr")
-write.csv(pairwise_results, paste0(CSV, "/YersiniaPG_vs_nonPG_wilcox_statistics_Yps_enrichment_comparison.csv"))
-# View the results (p-adj < 0.05 are significant)
-print(pairwise_results)
-
-
-
-library(ggpubr)
-
-# Create the plot
-ggboxplot(meta_compare, x = "ProgressClass", y = "Saa1_enrichment",
-          fill = "ProgressClass", palette = "jco") +
-  stat_compare_means(method = "kruskal.test", label.y = max(meta_compare$Saa1_enrichment) * 1.1) + # Global p-value
-  stat_compare_means(comparisons = list(c("GroupA", "GroupB"), c("GroupB", "GroupC")), # Add specific pairs of interest
-                     method = "wilcox.test", label = "p.signif") + 
-  labs(title = "Saa1 Enrichment across Progress Classes",
-       y = "Enrichment Score",
-       x = "Progress Class") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
-
-
-
-
-
-
-
-
-# Alternative approach to test significance -permutation analysis 
-
-#line plot
-# Extract data from Seurat object
-plot_data <- data.frame(
-  progress = Yersinia_subset_epi$progress,
-  Saa1_Gene_Lists = FetchData(Yersinia_subset_epi, "Saa1_Gene_Lists")[,1]
-)
-
-# Remove rows with NA values
-plot_data <- na.omit(plot_data)
-
-# Bin "progress" into intervals of 0.2
-avg_data <- plot_data %>%
-  mutate(progress_bin = floor(progress / 0.2) * 0.2) %>%
-  group_by(progress_bin) %>%
-  summarise(
-    mean_Saa1 = mean(Saa1_Gene_Lists, na.rm = TRUE),  # or mean(...)
-    .groups = "drop"
-  )
-
-library(zoo)  # for rollapply
-
-# Sort and smooth using a rolling median with a window of ~6 points
-avg_data_smooth <- avg_data %>%
-  arrange(progress_bin) %>%
-  mutate(mean_Saa1_smooth = rollapply(mean_Saa1, width = 6, FUN = mean, fill = NA, align = "center"))
-
-highlight_regions <- data.frame(
-  xmin = c(12, 51),
-  xmax = c(16,  55),
-  ymin = -Inf,
-  ymax = Inf
-)
-
-
-# pg regions
-region1_bins <- seq(12, 16, by = 0.2)
-region2_bins <- seq(51, 55, by = 0.2)
-
-# calculate mean enrichment for two pg regions
-obs_mean1 <- avg_data %>% filter(progress_bin %in% region1_bins) %>% pull(mean_Saa1) %>% mean()
-obs_mean2 <- avg_data %>% filter(progress_bin %in% region2_bins) %>% pull(mean_Saa1) %>% mean()
-
-# Permutation
-set.seed(42) 
-n_permutations <- 10000
-null_distribution <- numeric(n_permutations)
-window_size <- length(region2_bins) # Number of bins in your highlight
-
-# Randomly Sample the same size window 10k times
-for (i in 1:n_permutations) {
-  # Randomly sample 'window_size' points from the entire mean_Saa1 pool
-  null_distribution[i] <- mean(sample(avg_data$mean_Saa1, window_size, replace = FALSE))
-}
-
-
-# P-value = (Number of times null >= observed) / total permutations
-p_val1 <- sum(null_distribution >= obs_mean1) / n_permutations
-p_val2 <- sum(null_distribution >= obs_mean2) / n_permutations
-
-null_df <- data.frame(dist = null_distribution)
-
-ggplot(null_df, aes(x = dist)) +
-  geom_histogram(bins = 50, fill = "skyblue", color = "white") +
-  geom_vline(xintercept = obs_mean1, color = "red", linetype = "dashed", linewidth = 1) +
-  geom_vline(xintercept = obs_mean2, color = "darkred", linetype = "dashed", linewidth = 1) +
-  annotate("text", x = obs_mean1, y = 500, label = paste("Region 1 P:", p_val1), color = "red", angle = 90, vjust = -0.5) +
-  annotate("text", x = obs_mean2, y = 500, label = paste("Region 2 P:", p_val2), color = "darkred", angle = 90, vjust = -0.5) +
-  labs(title = "Permutation Test Null Distribution",
-       subtitle = paste(n_permutations, "randomly sampled windows"),
-       x = "Mean Saa1 Enrichment", y = "Frequency") +
-  theme_minimal()
-
-ggsave( "Yps_enrichment_significance_rolling_permutation.svg",  plot = last_plot() , device = NULL,  path = images,  scale = 1,  width = 9,  height = 5,  units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
-
-
-
-
-
-
 
 # Myeloid Cell Further Annotation ----
 Idents(Ileum_annotated) <- "CoarseCellType"
@@ -2846,7 +2414,7 @@ FeaturePlot(subset_objects[["Myeloid cells"]], reduction = "umap", c("Epcam", "C
 FeaturePlot(subset_objects[["Myeloid cells"]], reduction = "umap", c("Plvap", "Eng", "Lyve1", "Lum", "Mki67"))
 FeaturePlot(subset_objects[["Myeloid cells"]], reduction = "umap", c("Jchain", "Igha", "Igkc", "Fgfr2" ))
 
-# Missegmentation is a slight problem. In the Myeloid cells, there are clusters formed by contaminating transcript leakage (misassigned transcripts)  - 
+# Missegmentation is a problem. In the Myeloid cells, there are clusters formed by contaminating transcript leakage (misassigned transcripts)  - 
 # Cluster 16 is tagln hi - muscle cells
 # Cluster 5 is high in Lum - a fibroblast marker
 # cluster 14 is Cd3e high for T cell links
@@ -3296,7 +2864,7 @@ Yersinia_subset$Progress_Class <- ifelse(
 # Check the counts
 table(Yersinia_subset$Progress_Class)
 
-# Now you can use it for coloring in ImageDimPlot
+# ImageDimPlot
 ImageDimPlot(
   Yersinia_subset,
   fov = "yersinia1",
@@ -3593,7 +3161,7 @@ cellchat3 <- mergeCellChat(object.list, add.names = names(object.list))
 
 #cellchat<- mergeCellChat(object.list, add.names = names(object.list))
 object.list2 <- list(Yersinia_pg = cellchat_pg, Yersinia_cc = cellchat_cc, Naive_cc = cellchat_na)
-#Identify CellTypes to keep - If you include cell types which are not present in different groups, you cannot perform the comparisons
+# Identify CellTypes to keep - If you include cell types which are not present in different comparison groups, you cannot perform the comparisons
 a<- as.character(sort(unique(cellchat_pg.df$source))) 
 b <-as.character(sort(unique(cellchat_cc.df$source)))
 c <-as.character(sort(unique(cellchat_na.df$source)))
@@ -3669,7 +3237,7 @@ for (i in 1:length(object.list2)) {
 # Aggregate Scatter 
 # in the below code you can separately graph for each cell type its ingoing and outgoing relative number of interactions and compare across plots
 object.list[[1]]@netP$pathways # access pathways
-levels(object.list[[1]]@idents) #Access cell types
+levels(object.list[[1]]@idents) #cell types
 num.link <- lapply(object.list2[1:3], function(x) {
   rowSums(x@net$count) + colSums(x@net$count) - diag(x@net$count)
 })
@@ -3721,7 +3289,7 @@ dev.off()
 
 
 library(reticulate)
-use_python("/home/hartandrew/.conda/envs/sccellfie_env/bin/python", required = TRUE)
+use_python("/path/to/envs/sccellfie_env/bin/python", required = TRUE)
 ptm = Sys.time()
 set.seed(40)
 cellchat2 <- computeNetSimilarityPairwise(cellchat2, type = "functional")
@@ -3819,7 +3387,7 @@ netVisual_aggregate(cellchat, signaling = "IL1",
                     #top = 0.25,
                     show.legend = FALSE)
 
-#Figure 7F
+#Figure 6F
 svg(paste0(images, "/Circle_gene_Yersinia_pg_IL1_all.svg"), 
     width = 10, height = 10)
 netVisual_aggregate(cellchat, signaling = "IL1",
@@ -3850,7 +3418,7 @@ gg2 <- rankNet(cellchat2, mode = "comparison", measure = "weight",   slot.name =
                cutoff.pvalue = 0.05,sources.use = c("Early Enterocyte", "Middle Enterocyte", "Late Enterocyte"),
                stacked = T, do.stat = TRUE, comparison = c(1,2))
 gg2
-# Figure 7D
+# Figure 6D
 svg(paste0(images, "/Ranknet_Enterocyte_Ligands_YersiniaPG_vs_YersiniaCC_net.svg"), 
     width = 4, height = 9)
 print(gg2 )

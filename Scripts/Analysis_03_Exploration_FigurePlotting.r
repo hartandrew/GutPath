@@ -9,7 +9,8 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 # Description. Using the annotated data for the MLn and Ileu. This script will explore that data and create major visualization. 
-# Figure Panels made: Figure 2A, Figure 2B, Figure S2A, Figure S2B, Figure 2D, Figure S2G, Figure 2C, Figure S2F, Figure S2D, Figure S2E, Figure S2C, Figure S1D, Figure S3A, Figure 2E, Figure 3A, Figure 3B, Figure S3B
+# Some figures have been moved from their original positions at the time of submission. Commented figure pointers should be mostly correct even if figure file names are not
+#Figure Panels made: Figure 1A, Figure 1B, Figure S3A,  Figure S3B, Figure 1D, Figure S3G, Figure 1C, Figure S3F, Figure S3D, Figure S3E, Figure S3C, Figure S2D, Figure S4B, Figure 1E, Figure 2A, Figure 2B, Figure S4C
 #Load Libraries 
 ```{r}
 library(Seurat)
@@ -82,7 +83,7 @@ Ileum_filt <- qs_read("/path/to/analysis/directory/Seurat_Files/Analysis2_cluste
 
 ```{r}
 #Graphing UMAPS
-# Figure2B
+# Figure1B
 library(ggrepel)
 umap_data <- Ileum_filt[["wnn.umap_cc"]]@cell.embeddings
 cluster_data <- Ileum_filt$CoarseCellType
@@ -243,7 +244,7 @@ ggplot(mean_features, aes(x = InfectionStatus, y = mean_nFeature)) +
     legend.position = "none"
   )+ coord_flip()
 
-#figure S2A
+#figure S3A
 ggsave( "Mean_nFeature_RNA_by_Infection_Ileum.svg",  plot = last_plot() , device = NULL,  path = images,  scale = 1,  width = 5,  height = 4,  units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
 
 
@@ -306,7 +307,7 @@ ggplot(mean_features, aes(x = InfectionStatus, y = mean_nFeature)) +
     legend.position = "none"
   )+ coord_flip()
 
-#figure S2A
+#figure S3A
 ggsave( "Mean_nFeature_RNA_by_Infection_MLN.svg",  plot = last_plot() , device = NULL,  path = images,  scale = 1,  width = 5,  height = 4,  units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
 ```
 
@@ -338,7 +339,7 @@ stacked_bar <- ggplot(fulldata, aes(x = count, y = InfectionStatus, color = "bla
     axis.text = element_text(color = "black"),
          legend.position = "none")
 stacked_bar
-# Figure S2B
+# Figure S3B
 ggsave( "TotalCellCounts_byinfecion_MLN_and_Ileum.svg",  plot = last_plot() , device = NULL,  path = images,  scale = 1,  width = 5,  height = 4,  units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
 ```
 
@@ -566,7 +567,7 @@ horizontal_bar <- ggplot(total_by_type, aes(x = total_count, y = MajorCellType))
         axis.title.y = element_blank())
 horizontal_bar
 
-#Figure 2D and Figure S2G
+#Figure 1D and Figure S3G
 combined_plot <-(stacked_bar ) /( dotplot ) + plot_layout(heights = c(1, 2)) 
 combined_plot 
 ggsave( "Ileum_filt_IEC_fig2_Count.svg",  plot = last_plot() , device = NULL,  path = images,  scale = 1,  width = 6,  height = 9,  units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
@@ -667,7 +668,7 @@ horizontal_bar <- ggplot(total_by_type, aes(x = total_count, y = MajorCellType))
         axis.title.y = element_blank())
 horizontal_bar
 
-#Figure 2D and Figure S2G
+#Figure 1D and Figure S3G
 combined_plot <-(stacked_bar ) /( dotplot ) + plot_layout(heights = c(1, 2)) 
 combined_plot 
 ggsave( "Ileum_filt_LP_fig2_Count.svg",  plot = last_plot() , device = NULL,  path = images,  scale = 1,  width = 6,  height = 9,  units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
@@ -738,7 +739,7 @@ make_dotplot <- function(df, tissue_label) {
       axis.text.y = element_text(size = 9)
     )
 }
-#Figure 2D and Figure S2G
+#Figure 1D and Figure S3G
 dotplot_IEL <- make_dotplot(data_all, "Intestinal Epithelial Cells")
 dotplot_LP  <- make_dotplot(data_all, "Lamina Propria")
 
@@ -751,7 +752,7 @@ ggsave( "Ileum_bubbleplots_totalCondition_proportions_Fig2_Oct2025.svg",  plot =
 # Here I make an barchart displaying the "infection-specific" cell states in the ileum
 
 ```{r}
-Ileum_filt2 <- qs_read("/path/to/directory/Seurat_Files/Analysis2.5_Ileum.qs2")
+Ileum_filt2 <- qs_read("/data/hartandrew/Projects/MIST/MIST_Analysis/Seurat_Files/Analysis2.5_Ileum.qs2")
 unique(Ileum_filt2$SampleType)
 unique(Ileum_filt2$FinestCellType)
 all_conditions <- c("Naive", "Candida", "Cryptosporidium", "MNV",
@@ -847,7 +848,7 @@ p <- ggplot(data_Select, aes(x = FinestCellType, y = count, fill = InfectionStat
     fill = "Infection Status"
   )
 
-#Figure S3B
+#Figure S4C
 p + scale_y_break(c(4000, 8500))
 ggsave( "Infection_induced_CellTypes_CountBarplot_fig2.svg",  plot = last_plot() , device = NULL,  path = images,  scale = 1,  width = 9,  height = 5,  units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
 ```
@@ -952,7 +953,7 @@ horizontal_bar <- ggplot(total_by_type, aes(x = total_count, y = MajorCellType))
         axis.title.y = element_blank())
 horizontal_bar
 
-#Figure 2C, Figure S2F
+#Figure 1C, Figure S3F
 combined_plot <-(stacked_bar ) /( dotplot ) + plot_layout(heights = c(1, 2)) 
 combined_plot 
 ggsave( "MLN_filt_Total_fig2_Count.svg",  plot = last_plot() , device = NULL,  path = images,  scale = 1,  width = 6,  height = 9,  units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
@@ -1146,7 +1147,7 @@ ht <- Heatmap(
 )
 
 draw(ht, heatmap_legend_side = "right")
-#Figure S2D
+#Figure S3D
 # Save to SVG (properly structured)
 svg(paste0(images, "/Ileum_MajorCellType_ComplexHeatmap_output_v2.svg"), width = 11, height = 5)
 draw(ht, heatmap_legend_side = "right")
@@ -1229,7 +1230,7 @@ options(ComplexHeatmap.raster_device = NULL)
 svg(paste0(images, "/Ileum_MajorCellType_ComplexHeatmap_ADT_v2.svg"), width = 7, height = 8)
 draw(ht, heatmap_legend_side = "right")
 dev.off()
-#Figure S2E
+#Figure S3E
 pdf(paste0(images, "/Ileum_MajorCellType_ComplexHeatmap_ADT_v2.pdf"), width = 7, height = 8, useDingbats = FALSE)
 draw(ht, heatmap_legend_side = "right")
 dev.off()
@@ -1444,7 +1445,7 @@ ht <- Heatmap(
 )
 draw(ht, heatmap_legend_side = "right")
 # Save to SVG 
-#Figure S2C
+#Figure S3C
 svg(paste0(images, "/MLN_MajorCellType_ComplexHeatmap_output_v2_oct2025.svg"), width = 4, height = 8)
 draw(ht, heatmap_legend_side = "right")
 dev.off()
@@ -1566,13 +1567,13 @@ ReadNumber <- ggplot(summary_data,
   ylab("Number of Reads")
 
 ReadNumber
-#Figure S1D
+#Figure S2D
 ggsave("nCount_ADT_BArchart_Supplement1.svg", plot = last_plot(), path = images, width = 11, height = 4)
 ```
 
 
 #Figure Work - Graphing Subclustered Objects 
-# Figure 2E and Figure S3A are made from the following sections  in which the subset objects were plotted
+# Figure 1E and Figure S4B are made from the following sections  in which the subset objects were plotted
 ```{r}
 #Load the Subclustered Objects 
 Ileum_T_filt <- qs_read("/path/to/analysis/directory/Seurat_Files/Ileum_Tcell_intermediate.qs2")
@@ -2228,7 +2229,7 @@ ggsave( "Ileum_Stromal_Frequency_barchart.svg",  plot = last_plot() , device = N
 
 
 #Figure Work Graphing Subclustered MLN
-#Figure S3A
+#Figure S4B
 ```{r}
 #Load the Subclustered Objects 
 MLN_Bcell_filt <- qs_read("/path/to/analysis/directory/Seurat_Files/MLN_Bcell_intermediate.qs2")
@@ -2784,7 +2785,7 @@ ggsave("/path/to/analysis/directory/Images/Milo_Plots/Combined_Beeswarm_AllInfec
 ```
 
 ```{r}
-#Figure 3A and Figure 3B can be generated below. For 3A, the Epithelial milo object must be used. For 3B the Myeloid Milo object must be loaded
+#Figure 2A and Figure 2B can be generated below. For 2A, the Epithelial milo object must be used. For 2B the Myeloid Milo object must be loaded
 milo <- readRDS("/path/to/analysis/directory/Seurat_Files/CD4Tcell_milo.rds")
 milo <- readRDS("/path/to/analysis/directory/Seurat_Files/ILC_milo.rds")
 milo <- readRDS("/path/to/analysis/directory/Seurat_Files/Epithelial_milo.rds")
@@ -2932,7 +2933,7 @@ ggsave( "neighborhoodDA_Nippo_Epithelial.svg",  plot = last_plot() , device = NU
 ```
 
 ```{r}
-#Figure 3 demonstrating that Nippo has expansion fo Goblet cells and Tuft cells
+#Figure 2 demonstrating that Nippo has expansion fo Goblet cells and Tuft cells
 library(cowplot)
 library(scales)
 
@@ -2994,7 +2995,7 @@ plots <- lapply(seq_along(infections), function(i) {
 combined_plot <- plot_grid(plotlist = plots, ncol = 6, align = "hv")
 combined_plot
 # Save the combined plot
-#Figure 3A
+#Figure 2A
 ggsave(
   filename = file.path(images, "Tuft_Goblet_AllInfections_Beeswarm.svg"),
   plot = combined_plot,
@@ -3127,7 +3128,7 @@ plots <- lapply(seq_along(infections), function(i) {
   res$FDR_signFC <- ifelse(res$logFC < 0, -(1 - res$SpatialFDR), 1 - res$SpatialFDR)
   res$FDR_FC     <- 1 - res$SpatialFDR
   
-  # Filter to Monocytes and Neutrophils or other selected cells
+  # Filter to Monocytes / Neutrophils or other selected cells
   res <- res[res$secondlevel %in% cell_subset, ]
   if (nrow(res) == 0) return(NULL)
 
@@ -3166,7 +3167,7 @@ plots <- lapply(seq_along(infections), function(i) {
 combined_plot <- plot_grid(plotlist = plots, ncol = 6, align = "hv")
 combined_plot
 # Save the combined plot
-# Figure 3B
+# Figure 2B
 ggsave(
   filename = file.path(images, "Monocyte_Neutrophils_Neighborhood_milo_Beeswarm.svg"),
   plot = combined_plot,

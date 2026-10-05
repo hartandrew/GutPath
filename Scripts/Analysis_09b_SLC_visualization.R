@@ -1,6 +1,6 @@
 # The Purpose of this Script is to visulize the Genes in space to validate our scRNA pseudotime define expression patterns 
-# Figures S8E, Figure S8F, were made using XeniumExplorer
-# Figure S8G Produced in this script
+# Figures S9E, Figure S9F, were made using XeniumExplorer
+# Figure S9G Produced in this script
 # Load Libraries----
 # Analysis 
 library(Seurat)
@@ -38,7 +38,7 @@ library(qs2)
 # Loaded the all_objects_filtered Data 
 Seurat_obj <-qs2::qs_read("/path/to/directoryXenium_Yp_2025/Seurat/Seurat_all_proseg_Niches.qs2")
 
-#  slc genes from Figure 4G w
+#  slc genes from Figure 3G w
 
 
 slc_genes <- c(

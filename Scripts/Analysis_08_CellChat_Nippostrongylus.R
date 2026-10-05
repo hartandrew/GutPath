@@ -1,6 +1,7 @@
 #Description: Analysis of Nippostrongylus Enterocytes by Cell Chat 
+# Some figures have been moved from their original positions at the time of submission. Commented figure pointers should be mostly correct even if figure file names are not
 # Main Question: How are Enterocytes from Nippo infected mice different from comparable Naive enterocytes and other comparable Nippostrongylus enterocytes?
-#Figures Figure 5E and Figure 5F Figure 5D
+#Figures Figure 4E and Figure 4F Figure 4D
 ##Load the Libraries----
 library(Seurat)
 library(Signac)
@@ -32,6 +33,7 @@ options(future.globals.maxSize = 5000 * 1024^2)
 
 
 #directory set up----
+
 setwd("/path/to/analysis/directory")
 out <- "/path/to/analysis/directory/Output"
 version <- "/path/to/analysis/directory/Version"
@@ -229,7 +231,7 @@ patchwork::wrap_plots(plots = gg)
 
 
 library(reticulate)
-use_python("/home/hartandrew/.conda/envs/sccellfie_env/bin/python", required = TRUE)
+use_python("/path/to/envs/sccellfie_env/bin/python", required = TRUE)
 ptm = Sys.time()
 set.seed(40)
 cellchat2 <- computeNetSimilarityPairwise(cellchat2, type = "functional")
@@ -321,7 +323,7 @@ netVisual_chord_cell(object.list2[[2]],
                     targets.use = c("Enterocytes"),
                     #layout = "circle" ,
                     show.legend = TRUE)
-#Figure 5E
+#Figure 4E
 svg(paste0(images, "/enterocyte_targets_Il4_Nippostrongylus_chord_gene.svg"), 
     width = 10, height = 10)
 netVisual_chord_gene(
@@ -390,7 +392,7 @@ svg(paste0(images, "/Late_enterocyte_sources_Ranknet_Nippostrongylus_v_Naive_p_0
 print(gg1 )
 dev.off()
 
-# Figure 5F
+# Figure 4F
 object.list2[[2]]@netP$pathways
 svg(paste0(images, "/enterocyte_targets_FGF_Nippostrongylus_chord_gene.svg"), 
     width = 10, height = 10)

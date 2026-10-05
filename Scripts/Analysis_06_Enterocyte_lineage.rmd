@@ -8,9 +8,10 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
-# Description: This script focuses on the Enterocyte lineage within the MIST data. Pseudotime is performed as well as pseudotime modeled DEG analysis via Tradeseq
+# Description: This script focuses on the ENterocyte lineage within the MIST data. Pseudotime is performed as well as pseudotime modeled DEG analysis via Tradeseq
 # Investigations of the distinct Yersinia subset of enterocytes are performed and graphed 
-# Figures produced: Figure S6C, Figure 6A, Figure 4D, #Figure S5C, Figure 4F, #Figure 4G, Figure 4H, Figure 6B, Figure S7A, Figure S7B , Figure 6C, Figure 6E, Figure 6D, Figure S5B, Figure 6F, Figure S7D, Figure S5D-F
+# Some figures have been moved from their original positions at the time of submission. Commented figure pointers should be mostly correct even if figure file names are not
+# Figures produced: Figure S8C, Figure 5A, Figure 3D, #Figure S6C, Figure 3F, #Figure 3G, Figure 3H, Figure 5B, Figure S8A, Figure S8B , Figure 5C, Figure 5E, Figure 5D, Figure S6B, Figure 5F, Figure S8D, Figure S6D-F
 #Load Libraries 
 ```{r}
 library(Seurat)
@@ -46,7 +47,6 @@ options(future.globals.maxSize = 5000 * 1024^2)
 
 #Establish Directories
 ```{r} 
-getwd() #/home/hartandrew
 setwd("/path/to/analysis/directory")
 out <- "/path/to/analysis/directory/Output"
 version <- "/path/to/analysis/directory/Version"
@@ -174,7 +174,7 @@ DimPlot(Ileum_filt, reduction = "wnn.umap_cc",combine = FALSE, cells.highlight =
 
 
 # Graph the frequency of the Yersinia specific subset fo enterocytes 
-# Figure S7C
+# Figure S8C
 saa1_cells <- subset(Ileum_Epithelial2, subset = FinestCellType == "Saa1 inflammatory Enterocytes")
 
 # Count how many cells per InfectionStatus
@@ -289,7 +289,7 @@ ggsave( "ScaledImbalanceScore_UMAP_Enteorcytelineage.svg",  plot = last_plot() ,
 
 
 ```{r}
-# Figure 6A
+# Figure 5A
 target_conditions <- c("Candida", "Cryptosporidium", "MNV", "Nippostrongylus", "SFB_YA", "Yersinia")
 imbalance_plots <- list()
 
@@ -378,7 +378,7 @@ p <-ggplot(umap_data, aes(x = wnnepithelialumap_1, y = wnnepithelialumap_2, col 
     axis.title = element_blank()
   )
 p
-#Figure 4D
+#Figure 3D
 ggsave("Enterocyte_Pseudotime_Fig4.svg", plot = p,path = images,  width = 5, height = 4, dpi = 600)
 ```
 
@@ -501,7 +501,7 @@ for (gene in unique(GeneList)) {
 }
 ada_plot <- plot_list[["Ada"]] + theme(axis.text.x = element_text()) 
 (plot_list[["Lgr5"]] / plot_list[["Reg3b"]] / plot_list[["Slc5a1"]] /ada_plot ) + plot_layout(guides = "collect", heights = c(1, 1.1), nrow = 4) &  theme(legend.position = "right")
-#Figure S5C
+#Figure S6C
 ggsave(  "Enterocyte_all_Infection_linePlot.svg",  plot = last_plot() , device = NULL,  path = images,  scale = 1,  width = 2,  height =6, units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
 
 ```
@@ -627,7 +627,7 @@ proportion_plot <- ggplot(cell_proportions, aes(x = bin_center, y = cell_proport
 
 
 proportion_plot
-#Figure 4F
+#Figure 3F
 ggsave(  "ProportionCells_Across_pseudotime_per_infection_linePlot.svg",  plot = last_plot() , device = NULL,  path = images,  scale = 1,  width = 6,  height =5, units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
 ```
 
@@ -676,7 +676,7 @@ for (gene in unique(GeneList)) {
 }
 ada_plot <- plot_list[["Ada"]] + theme(axis.text.x = element_text()) 
 (plot_list[["Lgr5"]] / plot_list[["Reg3b"]] / plot_list[["Slc5a1"]] / ada_plot) + plot_layout(guides = "collect", heights = c(1, 1.1), nrow = 4) &  theme(legend.position = "right")
-#Figure S5C
+#Figure S6C
 ggsave(  "Naive_Enterocyte_all_linePlot.svg",  plot = last_plot() , device = NULL,  path = images,  scale = 1,  width = 2,  height =6, units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
 
 ```
@@ -864,7 +864,7 @@ entero_solutes <- pheatmap(gene_matrix,
          #annotation_col = annotation_col,  
          annotation_colors = list(cell_type = cell_type_colors), 
          color = colorRampPalette(brewer.pal(9, "Blues"))(100),  
-         border_color = NA,           
+         border_color = NA,           # Optional: remove borders around cells
          fontsize = 10,              
          height = 8,                  
          width = 10,                  
@@ -1081,14 +1081,14 @@ ggplot(gost_df_transport, aes(x = reorder(term_name, -log10(p_value)), y = -log1
     legend.position = "bottom", 
     panel.border = element_rect(color = "black")
   ) + coord_flip()
-# Figure S5D
+
 ggsave( "Naive_tradeseq_Genes_Ontology_GOBP_Trasnport_selected.svg",  plot = last_plot() , device = NULL, 
         path = images, width =8,  height = 5,  units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
 
 
 #Make Heatmaps of the Unique genes contained within the metabolic and transport groups 
 
-#Figure S5E Figure S5F below
+
 gost_df_transport <- gost_df[gost_df$term_name %in% c(transport_pathways),]
 TransportGenes <- gost_df_transport$intersection
 TransportGenes_vec <- unique(trimws(unlist(strsplit(TransportGenes, ","))))
@@ -1205,7 +1205,7 @@ pheatmap(mat_ordered, cluster_cols = FALSE, show_colnames = FALSE, show_rownames
          main = "Naive - Pseudotime Dynamics", fontsize_row = 6)
 
 # Plot the heatmap
-# Figure 4G 
+# Figure 3G 
 SLC_naive_SLC <- pheatmap(mat_ordered,
                       cluster_cols = FALSE, 
                       cluster_rows = F,  # don't re-cluster now that it's ordered
@@ -1474,7 +1474,7 @@ dev.off()
 ```
 
 ```{r}
-# Figure 4H Infection specific changes to SLC genes  
+# Figure 3H Infection specific changes to SLC genes  
 # Isolate the Genes to examine
 infection_slc_genes <-  sig_gene_list[sig_gene_list %in% rownames(genes_help)] #29 Genes
 yhatSmooth <- predictSmooth(sce, gene = infection_slc_genes, nPoints = 50, tidy = FALSE)
@@ -1594,7 +1594,7 @@ p <- grid.arrange(
   ncol = 1
 )
 p 
-# Figure 4H
+# Figure 3H
 pdf(paste0(images, "/gene_condition_pseudotime_heatmaps_Fig4H.pdf"), width = 12, height = 5)
 grid.arrange(
   arrangeGrob(grobs = row1, nrow = 1, widths = widths_row1),
@@ -1771,7 +1771,7 @@ grid.arrange(heatSmooth_Naive[[4]], heatSmooth_Candida[[4]], heatSmooth_Crypto[[
              heatSmooth_SFB[[4]],
              heatSmooth_Yersinia[[4]], ncol = 7, widths=c(2.56,1, 1, 1, 1, 1, 1.45))
 library(svglite)
-# Figure 4H
+# Figure 3H
 svglite(paste0(images, "/SLC_DEG_Enterocyte_PhysioGenes_Genes_Heat.svg"), width = 8, height = 5)
 grid.arrange(heatSmooth_Naive[[4]], heatSmooth_Candida[[4]], heatSmooth_Crypto[[4]], heatSmooth_MNV[[4]],
              heatSmooth_Nippo[[4]],
@@ -1994,7 +1994,7 @@ ggplot(DEGs_lfc2_p0.05, aes(x = Condition, y = DEG_Number), fill  = "black") +
     axis.title.x = element_blank(),
     legend.position = "none"
   )
-#Figure 6B
+#Figure 5B
 ggsave( "Total_EnterocyteDEGS_tradeseq_2lfc_p0.05.svg",  plot = last_plot() , device = NULL, 
         path = images, width = 7,  height = 5,  units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
 ```
@@ -2208,7 +2208,7 @@ heatSmooth_Naive <- pheatmap(yhatSmoothScaled[heatSmooth_Yersinia$tree_row$order
 
 grid.arrange(heatSmooth_Naive[[4]],  heatSmooth_Yersinia1[[4]], ncol = 2, widths=c(1, 1.35))
 library(svglite)
-#Figure S7A
+#Figure S8A
 svglite(paste0(images, "/Yersinia_and_Naive_Enterocyte_Genes_HEat_Tradeseq.svg"), width = 5, height = 6)
 grid.arrange(heatSmooth_Naive[[4]],  heatSmooth_Yersinia[[4]], ncol = 2, widths=c(1, 1.6))
 dev.off()
@@ -2389,7 +2389,7 @@ p <-ggplot(umap_data2, aes(x = wnnepithelialumap_1, y = wnnepithelialumap_2, col
     axis.title = element_blank()
   ) 
 p
-#Figure S7B and Figure 6C
+#Figure S8B and Figure 5C
 ggsave( "Yersinia_UCell_YP_ENterocyte_Genes_Umap_abbrev.svg",  plot = last_plot() , device = NULL, 
         path = images, width =6,  height = 5,  units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
 
@@ -2446,7 +2446,7 @@ ggplot(cell_freq_pct, aes(x = InfectionStatus, y = percent, fill = FinestCellTyp
     axis.text.x = element_text(angle = 45, hjust = 1),
     text = element_text(size = 14)
   )
-#Figure 6E
+#Figure 5E
 ggsave( "Yersinia_FrequencyBarChart_EnterocytePopulations_downsam_stacked.svg",  plot = last_plot() , device = NULL, 
         path = images, width =6,  height =5,  units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
 
@@ -2507,7 +2507,7 @@ plot <- ggplot(umap_data, aes(x = wnnepithelialumap_1, y = wnnepithelialumap_2, 
     legend.title = element_blank()
   ) 
 plot 
-#Figure 6D
+#Figure 5D
 ggsave( "Ileum_Enterocyte_UMAP_highlight_saa1_NoLabels.svg",  plot = last_plot() , device = NULL, 
         path = images, width = 9,  height = 9,  units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
 plot + geom_text_repel(data = centroids, aes(label = cluster), size = 3, fontface = "bold", 
@@ -2590,7 +2590,7 @@ ggplot(gost_df, aes(x = term_id, y = -log10(p_value), color = sig)) +
     axis.ticks.x = element_blank(),
      panel.border  = element_rect(colour = "black", fill = NA), 
   )
-#Figure 6F
+#Figure 5F
 ggsave( "Saa1_defining_genes_GOBPontology_mahattan.svg",  plot = last_plot() , device = NULL, 
         path = images, width =9,  height = 5,  units = c("in"),  dpi = 600,  limitsize = TRUE,  bg = NULL)
 ```
@@ -2726,7 +2726,7 @@ ggraph(g, layout = "fr") +
   theme_void()
 
 # Save as SVG
-#Figure S7D
+#Figure S8D
 ggsave(paste0(images, "/Top_TF_network.svg"), width = 10, height = 8) # Srbp1
 
 
@@ -2873,7 +2873,7 @@ stat3_ggheat <- ggplot(
 stat3_ggheat
 
 library(svglite)
-#Figure 6G
+#Figure 5G
 svglite(
   file = paste0(images, "/STAT3_heatmap_Enterocytes_Yersinia_Formatted.svg"),
   width = 12,
@@ -2891,7 +2891,7 @@ dev.off()
 ```{r}
 
 library(reticulate)
-use_python("/home/hartandrew/.conda/envs/sccellfie_env/bin/python", required = TRUE)
+use_python("/path/to/envs/sccellfie_env/bin/python", required = TRUE)
 library(sceasy)
 
 
@@ -2910,7 +2910,7 @@ sceasy::convertFormat(Ileum_temp, from = "seurat", to = "anndata", main_layer = 
 ```{r}
 #Our sccellfie and cell-cell communication results suggest that enterocytes from nippostrongylus have an altered metabolic profile and might be responding to Il4 or IL13. We want to test whether there is a connection between these in silico. 
 # Previously, others have stimulated intestinal organoids with IL4 and performed RNAseq. We can test whether our transcriptional data might reflect these changes.
-#I could Isolate the genes from the enriched pathways (Figure 5B) and test whether they have a STAT6 signature 
+#I could Isolate the genes from the enriched pathways (Figure 4B) and test whether they have a STAT6 signature 
 
 # Load the Task by gene information from sccellfie (from their Github)
 
@@ -3037,7 +3037,7 @@ lipid_ggheat <- ggplot(
 lipid_ggheat
 
 library(svglite)
-#Figure S5
+#Figure S6
 svglite(
   file = paste0(images, "/Lipid_genes_heatmap_Enterocytes.svg"),
   width = 16,
@@ -3059,7 +3059,7 @@ library(escape)
 library(UCell)
 
 #Load Gene set 
-genesets_Il4<- getGmt("/path/to/directoryGenesets/IL4_signature_enteroids.gmt", geneIdType=SymbolIdentifier())
+genesets_Il4<- getGmt("/data/hartandrew/Projects/Genesets/IL4_signature_enteroids.gmt", geneIdType=SymbolIdentifier())
 genes_il4 <- GSEABase::geneIds(genesets_Il4)
 unlist_genes_IL4 <- unlist(genes_il4)
 #Ileum_Epithelial_i[["RNA"]] <- JoinLayers(Ileum_Epithelial_i[["RNA"]])
@@ -3139,7 +3139,7 @@ ggsave( "Enterocyte_IL4_response_enrichment_UCell_Violins.svg",  plot = last_plo
 
 ```{r}
 # Identify whether there is an IL4 response detected in the Enterocytes of Nipostrongylus infected mice 
-genesets_Il4<- getGmt("/path/to/directoryGenesets/IL4_organoid_top100.gmt", geneIdType=SymbolIdentifier())
+genesets_Il4<- getGmt("/data/hartandrew/Projects/Genesets/IL4_organoid_top100.gmt", geneIdType=SymbolIdentifier())
 genes_il4 <- GSEABase::geneIds(genesets_Il4)
 unlist_genes_IL4 <- unlist(genes_il4)
 
@@ -3418,7 +3418,7 @@ unique(rownames(m))
 dend <- as.dendrogram(hclust(dist(m)))
 
 unique(rownames(m))
-preferred_order <- c("Nippostrongylus_Intestinal Epithelial Cells_CHMI25134", "Nippostrongylus_Intestinal Epithelial Cells_CHMI25132", "Yersinia_Intestinal Epithelial Cells_CHMI24311", "Yersinia_Intestinal Epithelial Cells_CHMI24134", "Yersinia_Intestinal Epithelial Cells_CHMI24142", "Cryptosporidium_Intestinal Epithelial Cells_CHMI24240", "Cryptosporidium_Intestinal Epithelial Cells_CHMI2489", "Candida_Intestinal Epithelial Cells_CHMI24218", "MNV_Intestinal Epithelial Cells_CHMI24282", "MNV_Intestinal Epithelial Cells_CHMI24268", "Naive_Intestinal Epithelial Cells_CHMI24109", "Naive_Intestinal Epithelial Cells_CHMI2482", "SFB_Intestinal Epithelial Cells_CHMI25114", "SFB_Intestinal Epithelial Cells_CHMI25100") # this preserved the heirarchy and only swivels branches
+preferred_order <- c("Nippostrongylus_Intestinal Epithelial Cells_CHMI25134", "Nippostrongylus_Intestinal Epithelial Cells_CHMI25132", "Yersinia_Intestinal Epithelial Cells_CHMI24311", "Yersinia_Intestinal Epithelial Cells_CHMI24134", "Yersinia_Intestinal Epithelial Cells_CHMI24142", "Cryptosporidium_Intestinal Epithelial Cells_CHMI24240", "Cryptosporidium_Intestinal Epithelial Cells_CHMI2489", "Candida_Intestinal Epithelial Cells_CHMI24218", "MNV_Intestinal Epithelial Cells_CHMI24282", "MNV_Intestinal Epithelial Cells_CHMI24268", "Naive_Intestinal Epithelial Cells_CHMI24109", "Naive_Intestinal Epithelial Cells_CHMI2482", "SFB_Intestinal Epithelial Cells_CHMI25114", "SFB_Intestinal Epithelial Cells_CHMI25100")
 
 dend_rotated <- rotate(dend, preferred_order)
 plot(dend_rotated, 
@@ -3760,7 +3760,7 @@ Ileum_filt_temp2@assays$ADT <- NULL
 #Ileum_filt_temp2[["RNA"]] <- JoinLayers(Ileum_filt_temp2[["RNA"]])
 #Ileum_filt_temp2[["RNA"]] <- as(Ileum_filt_temp2[["RNA"]] , "Assay")
 library(reticulate)
-use_python("/home/hartandrew/.conda/envs/sccellfie_env/bin/python", required = TRUE)
+use_python("/path/to/envs/sccellfie_env/bin/python", required = TRUE)
 library(sceasy)
 sceasy::convertFormat(Ileum_filt_temp2, from = "seurat", to = "anndata", main_layer = "data",  outFile = "/path/to/directory/Seurat_Files/CEllxGene_Ileum_Feb2026.h5ad")
 
